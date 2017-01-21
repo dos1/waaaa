@@ -1,0 +1,6 @@
+[submodule "libsuperderpy"]
+	path = libsuperderpy
+	url = ../libsuperderpy
+[submodule "libsuperderpy-utils"]
+	path = libsuperderpy-utils
+	url = ../libsuperderpy-utils
