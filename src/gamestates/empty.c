@@ -24,8 +24,8 @@
 #include "fftw3.h"
 #include <math.h>
 
-const WIDTH = 2;
-const HEIGHT = 2;
+const int WIDTH = 2;
+const int HEIGHT = 2;
 
 
 const ALLEGRO_AUDIO_DEPTH audio_depth = ALLEGRO_AUDIO_DEPTH_UINT8;
@@ -56,9 +56,10 @@ struct GamestateResources {
 		ALLEGRO_FONT *font;
 		int blink_counter;
 int samples;
+float rotation;
     ALLEGRO_AUDIO_RECORDER *r;
 
-		ALLEGRO_BITMAP *pixelator;
+		ALLEGRO_BITMAP *pixelator, *blurer;
 
 		float vx, vy, x, y;
 fftw_complex *out;
@@ -71,7 +72,7 @@ int Gamestate_ProgressCount = 1; // number of loading steps as reported by Games
 void Gamestate_Logic(struct Game *game, struct GamestateResources* data) {
 	// Called 60 times per second. Here you should do all your game logic.
 
-
+//data->blink_counter++;
 
 	if (!buffer) return;
 
@@ -85,17 +86,21 @@ void Gamestate_Logic(struct Game *game, struct GamestateResources* data) {
 		 if (gain < abs(buffer[i] - sample_center))
 			  gain = abs(buffer[i] - sample_center);
 	}
+//if (gain > 5) {
+	data->blink_counter = gain / 4.0;
+//}
 
+data->rotation += data->blink_counter;
 
-	 /* Save raw bytes to disk. Assumes everything is written
+  /* Save raw bytes to disk. Assumes everything is written
 		* succesfully. */
-	 /*if (fp && n < frequency / (float) samples_per_fragment *
+   /*if (fp && n < frequency / (float) samples_per_fragment *
 			max_seconds_to_record) {
 			al_fwrite(fp, input, sample_count * sample_size);
 			++n;
 	 }*/
 
-	 /* Draw a pathetic visualization. It draws exactly one fragment
+   /* Draw a pathetic visualization. It draws exactly one fragment
 		* per frame. This means the visualization is dependent on the
 		* various parameters. A more thorough implementation would use this
 		* event to copy the new data into a circular buffer that holds a
@@ -103,7 +108,7 @@ void Gamestate_Logic(struct Game *game, struct GamestateResources* data) {
 		* draw that last second of audio, which would cause the
 		* visualization to appear constant across all different settings.
 		*/
-	for (i = 0; i < 320; ++i) {
+  for (i = 0; i < 320; ++i) {
 		 int j, c = 0;
 
 		 /* Take the average of R samples so it fits on the screen */
@@ -197,9 +202,9 @@ if (out[i][0] > 8) out[i][0] = 8;
 	}
 	data->vy += 0.05;
 
-	if (data->y > 178) {
+	if (data->y > 178-5) {
 		data->vy = -data->vy / 3;
-		data->y = 178;
+		data->y = 178-5;
 	}
 
 	if (data->x < 0) {
@@ -222,7 +227,7 @@ if (out[i][0] > 8) out[i][0] = 8;
 	int next = 180 - out[i+1][0] * 10;
 	//PrintConsole(game, "data->y %f, pos %d", data->y, pos);
 
-	if (data->y >= pos) {
+	if (data->y - HEIGHT >= pos) {
 
 		//PrintConsole(game, "i %d pos data->y %f pos %d out[i][0] %f", i, data->y, pos, out[i][0]);
 
@@ -270,7 +275,7 @@ void Gamestate_Draw(struct Game *game, struct GamestateResources* data) {
 	al_clear_to_color(al_map_rgb(0,0,0));
 
 al_set_target_bitmap(data->pixelator);
-al_clear_to_color(al_map_rgb(0,0,0));
+al_clear_to_color(al_map_rgba(0,0,0,0));
 
 
   if (data->blink_counter < 50) {
@@ -290,13 +295,48 @@ al_draw_filled_rectangle(x, 180 - data->out[i][0] * 10, x+width, 180, al_map_rgb
   x+= width;
 }
 
+al_draw_filled_rectangle(0, 180-5, 320, 180, al_map_rgb(255,255,255));
 
-  al_draw_filled_rectangle(data->x, data->y, data->x + WIDTH, data->y + HEIGHT, al_map_rgb(255,0,255));
+  al_draw_filled_rectangle(data->x - WIDTH, data->y - HEIGHT, data->x + WIDTH, data->y + HEIGHT, al_map_rgb(255,0,255));
 
+	al_set_target_bitmap(data->blurer);
+	al_clear_to_color(al_map_rgba(0,0,0,0));
+
+	al_draw_scaled_bitmap(data->pixelator, 0, 0, 320, 180, 0, 0, 320/4, 180/4, 0);
 
 
 al_set_target_backbuffer(game->display);
-al_draw_bitmap(data->pixelator, 0, 0, 0);
+//al_draw_bitmap(data->blurer, 0, 0, 0);
+
+float s = data->blink_counter / 5.0;
+ALLEGRO_COLOR tint = al_map_rgba(32*s,32*s,32*s,32*s);
+
+float rot = sin(data->rotation / 20.0) / 20.0;
+
+float scale = 1 - (fabs((320/2) - data->x) / (320/2.0)) * 0.1;
+
+al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2, 180/2 - 40, 1.1*4*scale, 1.1*4*scale, rot, 0);
+al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 + 2, 180/2 - 40, 1.1*4*scale, 1.1*4*scale, rot, 0);
+al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 - 2, 180/2 - 40, 1.1*4*scale, 1.1*4*scale, rot, 0);
+al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 - 2, 180/2 - 40 - 3, 1.1*4*scale, 1.1*4*scale, rot, 0);
+al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 + 2, 180/2 - 40 - 3, 1.1*4*scale, 1.1*4*scale, rot, 0);
+
+al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 + 2, 180/2 - 200, 1.1*4*scale, 1.1*4*scale, rot, 0);
+
+
+al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2, 180/2 - 120, 1.1*4*scale, 1.1*4*scale, rot, 0);
+al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 + 2, 180/2 - 120, 1.1*4*scale, 1.1*4*scale, rot, 0);
+al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 - 2, 180/2 - 120, 1.1*4*scale, 1.1*4*scale, rot, 0);
+al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 - 2, 180/2 - 120 - 3, 1.1*4*scale, 1.1*4*scale, rot, 0);
+al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 + 2, 180/2 - 120 - 3, 1.1*4*scale, 1.1*4*scale, rot, 0);
+
+float offset = data->blink_counter / 2.0 * (rand() / (float)INT_MAX);
+
+al_draw_tinted_scaled_rotated_bitmap(data->pixelator, al_map_rgba(0,192,192, 192), 320/2, 180*(3/4), 320/2 - 2*offset, 180/2 - 120, 1.1*scale, 1.1*scale, rot, 0);
+al_draw_tinted_scaled_rotated_bitmap(data->pixelator, al_map_rgba(192,0,0, 192), 320/2, 180*(3/4), 320/2 + 2*offset, 180/2 - 120, 1.1*scale, 1.1*scale, rot, 0);
+
+al_draw_scaled_rotated_bitmap(data->pixelator, 320/2, 180*(3/4), 320/2, 180/2 - 120, 1.1*scale, 1.1*scale, rot, 0);
+
 }
 
 
@@ -340,6 +380,7 @@ void* Gamestate_Load(struct Game *game, void (*progress)(struct Game*)) {
 	progress(game); // report that we progressed with the loading, so the engine can draw a progress bar
 
 	data->pixelator = al_create_bitmap(320, 180);
+	data->blurer = al_create_bitmap(320/4, 180/4);
 
 
 	data->r = al_create_audio_recorder(1000, samples_per_fragment, frequency,
