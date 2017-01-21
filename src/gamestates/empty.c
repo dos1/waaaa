@@ -20,6 +20,7 @@
  */
 
 #include "../common.h"
+#include <allegro5/allegro_color.h>
 #include <libsuperderpy.h>
 #include "fftw3.h"
 #include <math.h>
@@ -60,9 +61,19 @@ float rotation;
     ALLEGRO_AUDIO_RECORDER *r;
 
 		ALLEGRO_BITMAP *pixelator, *blurer;
-
-		float vx, vy, x, y;
+ALLEGRO_SHADER *shader;
+    float vx, vy, x, y;
 fftw_complex *out;
+
+ALLEGRO_AUDIO_STREAM *audio;
+
+ALLEGRO_AUDIO_STREAM *recording;
+
+uint8_t rec_buffer[4096*2];
+int rec_buffer_pos;
+
+  char level[80][45];
+
 };
 audio_buffer_t buffer = NULL;
 int prev = 0;
@@ -190,6 +201,8 @@ if (out[i][0] > 8) out[i][0] = 8;
 
   data->out = out;
 
+	int oldx = data->x;
+	int oldy = data->y;
 
 
 	data->x += data->vx;
@@ -202,7 +215,7 @@ if (out[i][0] > 8) out[i][0] = 8;
 	}
 	data->vy += 0.05;
 
-	if (data->y > 178-5) {
+	if (data->y > 180-HEIGHT-5) {
 		data->vy = -data->vy / 3;
 		data->y = 178-5;
 	}
@@ -214,6 +227,13 @@ if (out[i][0] > 8) out[i][0] = 8;
 	if (data->x > 320) {
 		data->vx = -data->vx;
 		data->x = 320;
+	}
+	if (data->y == 180-HEIGHT-5) {
+		if (data->vx > 0) {
+			data->vx -= 0.01;
+		} else if (data->vx < 0) {
+			data->vx += 0.01;
+		}
 	}
 
 
@@ -247,7 +267,7 @@ if (out[i][0] > 8) out[i][0] = 8;
 		}
 		else if ((x <= data->x) && (x + width >= data->x)) {
 			data->vy = (pos - data->y) / 25 - data->vy * 0.25;
-			data->vx += (rand() / (float)INT_MAX) - 0.5;
+			data->vx += ((rand() / (float)INT_MAX) - 0.5) * 2;
 			data->y = pos;
 			PrintConsole(game, "center bump %d", pos);
 
@@ -261,8 +281,62 @@ if (out[i][0] > 8) out[i][0] = 8;
 
 	}
 
+
 //	al_draw_filled_rectangle(x, 180 - data->out[i][0] * 10, x+width, 180, al_map_rgb(255,255,255));
 	  x+= width;
+	}
+
+
+	// collision with level
+
+	int oldsx = (int)(oldx / 4);
+	int oldsy = (int)(oldy / 4);
+
+	int sx = (int)(data->x /4);
+	int sy = (int)(data->y /4);
+
+	int tx = oldsx; int ty = oldsy;
+
+	int colx = sx; int coly = sy;
+
+	while ((tx != sx) && (ty != sy)) {
+		if (data->level[tx][ty] == '0') {
+			colx = tx;
+			coly = ty;
+			break;
+		}
+
+		if (tx != sx) { if (sx > tx) tx++; else tx--; }
+		if (ty != sy) { if (sy > ty) ty++; else ty--; }
+	}
+
+	if (data->level[colx][coly] == 'O') {
+		if (data->x != colx * 4) {
+			data->blink_counter=3;
+		}
+		if (data->y != coly * 4) {
+			data->blink_counter=3;
+		}
+		  data->x = colx * 4;
+			data->y = coly * 4;
+/*		if (data->vx > 0) {
+			data->x = -4;
+		} else {
+			data->x = +4;
+		}
+		if (data->vy > 0) {
+			data->y = -4;
+		} else {
+			data->y = +4;
+		}*/
+		PrintConsole(game, "collision %d %d", (int)(data->x / 4), (int)(data->y / 4));
+
+		data->vx = -data->vx * 0.5;
+		data->vy = -data->vy * 0.5;
+
+		if (fabs(data->vx) < 0.1) {
+			data->vx *= 10;
+		}
 	}
 
 	fftw_destroy_plan(p1);
@@ -273,6 +347,16 @@ void Gamestate_Draw(struct Game *game, struct GamestateResources* data) {
 	// Called as soon as possible, but no sooner than next Gamestate_Logic call.
 	// Draw everything to the screen here.
 	al_clear_to_color(al_map_rgb(0,0,0));
+
+	al_set_target_bitmap(data->pixelator);
+
+	al_clear_to_color(al_color_hsv(fabs(sin(data->rotation/360.0)) * 360, 0.75, 0.5 + sin(data->rotation/20.0)/20.0));
+
+al_set_target_backbuffer(game->display);
+al_use_shader(data->shader);
+al_set_shader_int("scaleFactor", 2);
+al_draw_bitmap(data->pixelator, 0, 0, 0);
+al_use_shader(NULL);
 
 al_set_target_bitmap(data->pixelator);
 al_clear_to_color(al_map_rgba(0,0,0,0));
@@ -285,7 +369,18 @@ al_clear_to_color(al_map_rgba(0,0,0,0));
 
 if (!data->out) { return; }
 
+for (int x=0; x<80; x++) {
+	for (int y=0; y<45; y++) {
+		if (data->level[x][y]=='O') {
+			al_draw_filled_rectangle(x*4, y*4, x*4+4, y*4+4, al_map_rgb(255,255,255));
+		}
+	}
+}
+{
 
+int x = data->x / 4; int y = data->y / 4;
+  al_draw_filled_rectangle(x*4, y*4, x*4+4, y*4+4, al_map_rgba(16,16,16,16));
+}
 float x = 0; float width = 8;
 
 for (int i = 8; i <= 50; i++) {
@@ -297,7 +392,10 @@ al_draw_filled_rectangle(x, 180 - data->out[i][0] * 10, x+width, 180, al_map_rgb
 
 al_draw_filled_rectangle(0, 180-5, 320, 180, al_map_rgb(255,255,255));
 
-  al_draw_filled_rectangle(data->x - WIDTH, data->y - HEIGHT, data->x + WIDTH, data->y + HEIGHT, al_map_rgb(255,0,255));
+  al_draw_filled_rectangle(data->x - WIDTH, data->y - HEIGHT, data->x + WIDTH, data->y + HEIGHT,
+	                         //al_color_hsv(fabs(sin((data->rotation/360.0)+ALLEGRO_PI/4.0)) * 360, 1, 1));
+
+	                         al_map_rgb(255,255,0));
 
 	al_set_target_bitmap(data->blurer);
 	al_clear_to_color(al_map_rgba(0,0,0,0));
@@ -313,7 +411,7 @@ ALLEGRO_COLOR tint = al_map_rgba(32*s,32*s,32*s,32*s);
 
 float rot = sin(data->rotation / 20.0) / 20.0;
 
-float scale = 1 - (fabs((320/2) - data->x) / (320/2.0)) * 0.1;
+float scale = 1 - pow((fabs((320/2) - data->x) / (320/2.0)),2) * 0.1;
 
 al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2, 180/2 - 40, 1.1*4*scale, 1.1*4*scale, rot, 0);
 al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 + 2, 180/2 - 40, 1.1*4*scale, 1.1*4*scale, rot, 0);
@@ -335,7 +433,12 @@ float offset = data->blink_counter / 2.0 * (rand() / (float)INT_MAX);
 al_draw_tinted_scaled_rotated_bitmap(data->pixelator, al_map_rgba(0,192,192, 192), 320/2, 180*(3/4), 320/2 - 2*offset, 180/2 - 120, 1.1*scale, 1.1*scale, rot, 0);
 al_draw_tinted_scaled_rotated_bitmap(data->pixelator, al_map_rgba(192,0,0, 192), 320/2, 180*(3/4), 320/2 + 2*offset, 180/2 - 120, 1.1*scale, 1.1*scale, rot, 0);
 
+al_use_shader(data->shader);
+al_set_shader_int("scaleFactor", 1);
+
 al_draw_scaled_rotated_bitmap(data->pixelator, 320/2, 180*(3/4), 320/2, 180/2 - 120, 1.1*scale, 1.1*scale, rot, 0);
+
+al_use_shader(NULL);
 
 }
 
@@ -357,6 +460,7 @@ void Gamestate_ProcessEvent(struct Game *game, struct GamestateResources* data, 
 						* are coming in faster than we can update the screen, then it will be
 						* a problem.
 						*/
+
 		       ALLEGRO_AUDIO_RECORDER_EVENT *re = al_get_audio_recorder_event(ev);
 					 audio_buffer_t input = (audio_buffer_t) re->buffer;
 
@@ -367,6 +471,8 @@ void Gamestate_ProcessEvent(struct Game *game, struct GamestateResources* data, 
 					 memcpy(buffer, input, sizeof(uint8_t) * re->samples);
 
 data->samples = re->samples;
+
+
 //					al_flip_display();
 	      }
 
@@ -386,9 +492,45 @@ void* Gamestate_Load(struct Game *game, void (*progress)(struct Game*)) {
 	data->r = al_create_audio_recorder(1000, samples_per_fragment, frequency,
 	                                   audio_depth, ALLEGRO_CHANNEL_CONF_1);
 
+	data->shader = al_create_shader(ALLEGRO_SHADER_GLSL);
+	PrintConsole(game, "VERTEX: %d", al_attach_shader_source_file(data->shader, ALLEGRO_VERTEX_SHADER, GetDataFilePath(game, "vertex.glsl")));
+	PrintConsole(game, "%s", al_get_shader_log(data->shader));
+	PrintConsole(game, "PIXEL: %d", al_attach_shader_source_file(data->shader, ALLEGRO_PIXEL_SHADER, GetDataFilePath(game, "pixel.glsl")));
+	PrintConsole(game, "%s", al_get_shader_log(data->shader));
+	al_build_shader(data->shader);
+
+
+	ALLEGRO_FILE *file = al_fopen(GetDataFilePath(game, "levels/menu.lvl"), "r");
+
+	char buf;
+
+	int x = 0, y = 0;
+	while (al_fread(file, &buf, sizeof(char))) {
+		data->level[x][y] = buf;
+		if (buf!='\n') {
+			x++;
+			if (x==80) {
+				x=0;
+				y++;
+			}
+			if (y==45) {
+				break;
+			}
+		}
+	}
+
+
 	al_register_event_source(game->_priv.event_queue, al_get_audio_recorder_event_source(data->r));
 
 al_start_audio_recorder(data->r);
+/*
+data->audio = al_load_audio_stream(GetDataFilePath(game, "menu.ogg"), 4, 1024);
+//al_get_audio_stream_fragment(data->audio);
+
+al_register_event_source(game->_priv.event_queue, al_get_audio_stream_event_source(data->audio));
+al_set_audio_stream_playing(data->audio, true);
+al_attach_audio_stream_to_mixer(data->audio, game->audio.music);
+*/
 data->out = NULL;
   return data;
 }
