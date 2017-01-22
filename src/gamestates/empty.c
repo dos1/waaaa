@@ -144,6 +144,54 @@ if (data->screamtime < 0) data->screamtime = 0;
 	data->samples = samples;
 }
 
+
+float *hanning(int N, short itype)
+{
+	  int half, i, idx, n;
+		float *w;
+
+		w = (float*) calloc(N, sizeof(float));
+		memset(w, 0, N*sizeof(float));
+
+		if(itype==1)    //periodic function
+			  n = N-1;
+		else
+			  n = N;
+
+		if(n%2==0)
+		{
+			  half = n/2;
+				for(i=0; i<half; i++) //CALC_HANNING   Calculates Hanning window samples.
+					  w[i] = 0.5 * (1 - cos(2*ALLEGRO_PI*(i+1) / (n+1)));
+
+				idx = half-1;
+				for(i=half; i<n; i++) {
+					  w[i] = w[idx];
+						idx--;
+				}
+		}
+		else
+		{
+			  half = (n+1)/2;
+				for(i=0; i<half; i++) //CALC_HANNING   Calculates Hanning window samples.
+					  w[i] = 0.5 * (1 - cos(2*ALLEGRO_PI*(i+1) / (n+1)));
+
+				idx = half-2;
+				for(i=half; i<n; i++) {
+					  w[i] = w[idx];
+						idx--;
+				}
+		}
+
+		if(itype==1)    //periodic function
+		{
+			  for(i=N-1; i>=1; i--)
+					  w[i] = w[i-1];
+				w[0] = 0.0;
+		}
+		return(w);
+}
+
 void Gamestate_Logic(struct Game *game, struct GamestateResources* data) {
 	// Called 60 times per second. Here you should do all your game logic.
 
@@ -215,8 +263,13 @@ prev = 0;
 int N = data->samples;
   fftw_complex in[N], out[N];
 	fftw_plan p1;
+
+	float *window = hanning(N, 0);
+
 	for (int i = 0; i < N; i++) {
-		in[i][0] = buffer[i] *  (1.0 / 256);
+		double multiplier = 0.5 * (1 - cos(2*ALLEGRO_PI*i/2047));
+
+		in[i][0] = buffer[i] * (data->inmenu ? multiplier : window[i]) * (1.0/256.0);
 		  in[i][1] = 0;
 	}
 
@@ -228,12 +281,14 @@ for (int i = 1; i <= 320; i++) {
 out[i][0] = out[i][0] * out[i][0] + out[i][1] * out[i][1];
 }
 for (int i = 5; i <= 320; i++) {
+/*
+if(i*2<320)	  out[i*2][0] -= out[i][0];
+if(i*3<320)		out[i*3][0] -= out[i][0];
+if(i*4<320)		out[i*4][0] -= out[i][0];
+if(i*5<320)		out[i*5][0] -= out[i][0];
+if(i*6<320)		out[i*6][0] -= out[i][0];
 
-	  out[i*2][0] -= out[i][0];
-		out[i*3][0] -= out[i][0];
-//		out[i*4][0] -= out[i][0];
-//		out[i*5][0] -= out[i][0];
-//		out[i*6][0] -= out[i][0];
+if (out[i][0] < 0) out[i][0] = 0;*/
 
 /*	al_draw_line(i - 1, 128 + ((prev - min_sample_val) /
 		 (float) sample_range) * 256 - 128, i, 128 +
@@ -249,7 +304,7 @@ max=768;
 //al_draw_filled_rectangle(0, 180, 320, 180/2, al_map_rgb(255,255,255));
 
 
-for (int i = 8; i <= 50; i++) {
+for (int i = 8; i <= 100; i++) {
 /*	al_draw_line(i - 1, 128 + ((prev - min_sample_val) /
 	 (float) sample_range) * 256 - 128, i, 128 +
 	 ((out[i][0] - min_sample_val) / (float) sample_range) * 256 - 128,
@@ -271,9 +326,9 @@ if (out[i][0] > 8) out[i][0] = 8;
   //for (int i = 0; i < N; i++)
       //cout << out[i][0] << " + j" << out[i][1] << endl; // <<<
 
-  data->out = out;
 
-	int oldx = data->x;
+
+  int oldx = data->x;
 	int oldy = data->y;
 
 
@@ -449,6 +504,16 @@ if (out[i][0] > 8) out[i][0] = 8;
 		data->shakin_dudi--;
 	}
 
+
+	  for (int i=0; i< N; i++) {
+			if (data->out[i][0] > out[i][0]) {
+				data->out[i][0]-=0.666;
+			} else {
+				data->out[i][0] = out[i][0];
+			}
+			data->out[i][1] = out[i][1];
+		}
+
 }
 
 
@@ -502,7 +567,10 @@ int x = data->x / 4; int y = data->y / 4;
 }
 float x = 0; float width = 8;
 
-for (int i = 8; i <= 50; i++) {
+int OFF = 0;
+if (data->inmenu) OFF = 15;
+
+for (int i = 8 + OFF; i <= 50 + OFF; i++) {
 width -= 0.02;
 
 al_draw_filled_rectangle(x, 180 - data->out[i][0] * 10, x+width, 180, al_map_rgb(255,255,255));
@@ -646,6 +714,7 @@ void* Gamestate_Load(struct Game *game, void (*progress)(struct Game*)) {
 	struct GamestateResources *data = malloc(sizeof(struct GamestateResources));
 	data->font = al_create_builtin_font();
 
+	data->out = calloc(4096,sizeof(fftw_complex));
 
 	data->point_sample = al_load_sample( GetDataFilePath(game, "point.flac") );
 	data->point = al_create_sample_instance(data->point_sample);
@@ -693,7 +762,7 @@ al_set_mixer_postprocess_callback(game->audio.music, *handleaudio, data);
    //void (*pp_callback)(void *buf, unsigned int samples, void *data),
    //void *pp_callback_userdata)
 
-data->out = NULL;
+//data->out = NULL;
   return data;
 }
 
