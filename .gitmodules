@@ -1,6 +1,6 @@
 [submodule "libsuperderpy"]
 	path = libsuperderpy
-	url = ../libsuperderpy
-[submodule "libsuperderpy-utils"]
-	path = libsuperderpy-utils
-	url = ../libsuperderpy-utils
+	url = https://github.com/dos1/libsuperderpy.git
+[submodule "utils"]
+	path = utils
+	url = https://github.com/dos1/libsuperderpy-utils.git
