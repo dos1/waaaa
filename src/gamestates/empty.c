@@ -317,8 +317,8 @@ if (out[i][0] > 8) out[i][0] = 8;
 		if (data->y != coly * 4) {
 			data->blink_counter=3;
 		}
-		  data->x = colx * 4;
-			data->y = coly * 4;
+		  data->x = oldsx * 4;
+			data->y = oldsy * 4;
 /*		if (data->vx > 0) {
 			data->x = -4;
 		} else {
@@ -334,10 +334,22 @@ if (out[i][0] > 8) out[i][0] = 8;
 		data->vx = -data->vx * 0.5;
 		data->vy = -data->vy * 0.5;
 
-		if (fabs(data->vx) < 0.1) {
+		if (fabs(data->vx) < 0.2) {
 			data->vx *= 10;
 		}
+		if (fabs(data->vy) < 0.2) {
+			data->vy *= 10;
+		}
+
+		if ((data->x == oldx) && (data->y == oldy)) {
+			// we're stuck! RANDOMMMMM and hope for the best
+			data->vx = ((rand() / (float)INT_MAX) - 0.5) * 5;
+			data->vy = ((rand() / (float)INT_MAX) - 0.5) * 5;
+		}
 	}
+
+
+	data->vx += sin(data->rotation / 20.0) / 100.0;
 
 	fftw_destroy_plan(p1);
 
@@ -500,7 +512,7 @@ void* Gamestate_Load(struct Game *game, void (*progress)(struct Game*)) {
 	al_build_shader(data->shader);
 
 
-	ALLEGRO_FILE *file = al_fopen(GetDataFilePath(game, "levels/menu.lvl"), "r");
+	ALLEGRO_FILE *file = al_fopen(GetDataFilePath(game, "levels/menuborder.lvl"), "r");
 
 	char buf;
 
