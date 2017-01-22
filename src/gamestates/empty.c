@@ -25,8 +25,8 @@
 #include "fftw3.h"
 #include <math.h>
 
-const int WIDTH = 2;
-const int HEIGHT = 2;
+const int WIDTH = 3;
+const int HEIGHT = 3;
 
 
 const ALLEGRO_AUDIO_DEPTH audio_depth = ALLEGRO_AUDIO_DEPTH_UINT8;
@@ -71,6 +71,10 @@ ALLEGRO_AUDIO_STREAM *recording;
 
 uint8_t rec_buffer[4096*2];
 int rec_buffer_pos;
+
+int shakin_dudi;
+
+int score1, score2;
 
   char level[80][45];
 
@@ -266,7 +270,7 @@ if (out[i][0] > 8) out[i][0] = 8;
 			PrintConsole(game, "right bump %d", pos);
 		}
 		else if ((x <= data->x) && (x + width >= data->x)) {
-			data->vy = (pos - data->y) / 25 - data->vy * 0.25;
+			data->vy = (pos - data->y) / 25 - data->vy * 0.5;
 			data->vx += ((rand() / (float)INT_MAX) - 0.5) * 2;
 			data->y = pos;
 			PrintConsole(game, "center bump %d", pos);
@@ -308,6 +312,22 @@ if (out[i][0] > 8) out[i][0] = 8;
 
 		if (tx != sx) { if (sx > tx) tx++; else tx--; }
 		if (ty != sy) { if (sy > ty) ty++; else ty--; }
+	}
+
+	if ((data->level[colx][coly] == 'X') || (data->level[colx][coly] == 'Y')) {
+		data->vx = 0;
+		data->vy = 0;
+		data->x = 320/2;
+		data->y = 120;
+
+		data->shakin_dudi=120;
+
+		if (data->level[colx][coly] == 'X') {
+			data->score1 ++;
+		} else {
+			data->score2 ++;
+		}
+
 	}
 
 	if (data->level[colx][coly] == 'O') {
@@ -353,6 +373,12 @@ if (out[i][0] > 8) out[i][0] = 8;
 
 	fftw_destroy_plan(p1);
 
+	if (data->shakin_dudi) {
+		data->blink_counter = (rand() / (float)INT_MAX) * 15;
+		data->rotation+=data->blink_counter;
+		data->shakin_dudi--;
+	}
+
 }
 
 void Gamestate_Draw(struct Game *game, struct GamestateResources* data) {
@@ -386,6 +412,12 @@ for (int x=0; x<80; x++) {
 		if (data->level[x][y]=='O') {
 			al_draw_filled_rectangle(x*4, y*4, x*4+4, y*4+4, al_map_rgb(255,255,255));
 		}
+		if (data->level[x][y]=='X') {
+			al_draw_filled_rectangle(x*4, y*4, x*4+4, y*4+4, al_map_rgba(0,0,32,32));
+		}
+		if (data->level[x][y]=='Y') {
+			al_draw_filled_rectangle(x*4, y*4, x*4+4, y*4+4, al_map_rgba(32,0,0,32));
+		}
 	}
 }
 {
@@ -408,6 +440,10 @@ al_draw_filled_rectangle(0, 180-5, 320, 180, al_map_rgb(255,255,255));
 	                         //al_color_hsv(fabs(sin((data->rotation/360.0)+ALLEGRO_PI/4.0)) * 360, 1, 1));
 
 	                         al_map_rgb(255,255,0));
+
+	al_draw_textf(data->font, al_map_rgb(255,255,255), 320/2, 72, ALLEGRO_ALIGN_CENTER, data->shakin_dudi ? (((data->shakin_dudi / 10) % 2) ? "" : "SCORE!") : "WAAAA");
+	al_draw_textf(data->font, al_map_rgb(255,255,255), 320/2, 82, ALLEGRO_ALIGN_CENTER, "%d:%d", data->score1, data->score2);
+
 
 	al_set_target_bitmap(data->blurer);
 	al_clear_to_color(al_map_rgba(0,0,0,0));
@@ -512,7 +548,7 @@ void* Gamestate_Load(struct Game *game, void (*progress)(struct Game*)) {
 	al_build_shader(data->shader);
 
 
-	ALLEGRO_FILE *file = al_fopen(GetDataFilePath(game, "levels/menuborder.lvl"), "r");
+	ALLEGRO_FILE *file = al_fopen(GetDataFilePath(game, "levels/multi.lvl"), "r");
 
 	char buf;
 
@@ -558,11 +594,14 @@ void Gamestate_Start(struct Game *game, struct GamestateResources* data) {
 	// Called when this gamestate gets control. Good place for initializing state,
 	// playing music etc.
 	data->blink_counter = 0;
-
-	data->vx = 1;
-	data->vy = 2;
+data->shakin_dudi = 0;
+  data->vx = 0;
+	data->vy = 0;
 	data->x = 320/2;
-	data->y = 10;
+	data->y = 120;
+
+	data->score1 = 0;
+	data->score2 = 0;
 }
 
 void Gamestate_Stop(struct Game *game, struct GamestateResources* data) {
