@@ -58,12 +58,19 @@ struct GamestateResources {
 		int blink_counter;
 int samples;
 float rotation;
+int screamtime;
+bool inmenu;
+bool inrecording;
+bool inmulti;
     ALLEGRO_AUDIO_RECORDER *r;
-
-		ALLEGRO_BITMAP *pixelator, *blurer;
+struct Game *game;
+    ALLEGRO_BITMAP *pixelator, *blurer;
 ALLEGRO_SHADER *shader;
     float vx, vy, x, y;
 fftw_complex *out;
+
+ALLEGRO_SAMPLE_INSTANCE *point;
+ALLEGRO_SAMPLE *point_sample;
 
 ALLEGRO_AUDIO_STREAM *audio;
 
@@ -83,6 +90,59 @@ audio_buffer_t buffer = NULL;
 int prev = 0;
 
 int Gamestate_ProgressCount = 1; // number of loading steps as reported by Gamestate_Load
+void loadlevel(struct Game *game, struct GamestateResources *data, char* name);
+
+void nothing(void *buf, unsigned int samples, struct GamestateResources* data) {}
+
+void handleaudio(uint8_t *buf, unsigned int samples, struct GamestateResources* data) {
+	//PrintConsole(data->game, "samples %d", samples);
+
+	if (data->inrecording && data->inmenu) {
+		uint8_t max = 0;
+		for (int i=0; i<samples; i++) {
+			if (buf[i] > max) {
+				max = buf[i];
+			}
+		}
+		printf("max: %d\n", max);
+		if (max >= 140) {
+			data->screamtime+=20;
+		} else {
+			data->screamtime-=50;
+		}
+		if(data->screamtime > 255) {
+			data->screamtime = 255;
+
+			data->inmenu = false;
+			al_play_sample_instance(data->point);
+			data->inmulti = true;
+			loadlevel(data->game, data, "levels/multi.lvl");
+
+
+
+		}
+		if (data->screamtime < 0) data->screamtime = 0;
+		return;
+	}
+	if (!data->inmenu && !data->inrecording) return;
+
+if (!data->inmenu) {
+	data->screamtime-=50;
+if (data->screamtime < 0) data->screamtime = 0;
+}
+  audio_buffer_t input = (audio_buffer_t) buf;
+
+	if (samples > 4096) samples = 4096;
+
+	if (buffer) {
+		free(buffer);
+		buffer = NULL;
+	}
+	buffer = malloc(sizeof(uint8_t) * samples);
+	memcpy(buffer, input, sizeof(uint8_t) * samples);
+
+	data->samples = samples;
+}
 
 void Gamestate_Logic(struct Game *game, struct GamestateResources* data) {
 	// Called 60 times per second. Here you should do all your game logic.
@@ -94,12 +154,20 @@ void Gamestate_Logic(struct Game *game, struct GamestateResources* data) {
 	int sample_count = data->samples;
 	const int R = sample_count / 320;
 	int i, gain = 0;
+	if (data->inmenu) {
+	for (i = 0; i < sample_count; ++i) {
+		buffer[i] = (buffer[i]/2.0) + (sample_center-sample_center/2.0);
+	}
+	}
 
 	/* Calculate the volume, and display it regardless if we are actively
 	 * recording to disk. */
 	for (i = 0; i < sample_count; ++i) {
 		 if (gain < abs(buffer[i] - sample_center))
 			  gain = abs(buffer[i] - sample_center);
+	}
+	if (data->inmenu) {
+		gain /= 8.0;
 	}
 //if (gain > 5) {
 	data->blink_counter = gain / 4.0;
@@ -156,16 +224,16 @@ int N = data->samples;
 	fftw_execute(p1);
 float max = 0;
 
-for (int i = 1; i <= 640; i++) {
+for (int i = 1; i <= 320; i++) {
 out[i][0] = out[i][0] * out[i][0] + out[i][1] * out[i][1];
 }
-for (int i = 5; i <= 640; i++) {
+for (int i = 5; i <= 320; i++) {
 
 	  out[i*2][0] -= out[i][0];
 		out[i*3][0] -= out[i][0];
-		out[i*4][0] -= out[i][0];
-		out[i*5][0] -= out[i][0];
-		out[i*6][0] -= out[i][0];
+//		out[i*4][0] -= out[i][0];
+//		out[i*5][0] -= out[i][0];
+//		out[i*6][0] -= out[i][0];
 
 /*	al_draw_line(i - 1, 128 + ((prev - min_sample_val) /
 		 (float) sample_range) * 256 - 128, i, 128 +
@@ -328,6 +396,8 @@ if (out[i][0] > 8) out[i][0] = 8;
 			data->score2 ++;
 		}
 
+		al_play_sample_instance(data->point);
+
 	}
 
 	if (data->level[colx][coly] == 'O') {
@@ -381,6 +451,8 @@ if (out[i][0] > 8) out[i][0] = 8;
 
 }
 
+
+
 void Gamestate_Draw(struct Game *game, struct GamestateResources* data) {
 	// Called as soon as possible, but no sooner than next Gamestate_Logic call.
 	// Draw everything to the screen here.
@@ -389,6 +461,8 @@ void Gamestate_Draw(struct Game *game, struct GamestateResources* data) {
 	al_set_target_bitmap(data->pixelator);
 
 	al_clear_to_color(al_color_hsv(fabs(sin(data->rotation/360.0)) * 360, 0.75, 0.5 + sin(data->rotation/20.0)/20.0));
+	//al_draw_filled_rectangle(0, 180-data->screamtime, 320, 180, al_map_rgb(255,255,255));
+	al_draw_filled_rectangle(0, 0, 320, 180, al_map_rgba(data->screamtime, data->screamtime, data->screamtime, data->screamtime));
 
 al_set_target_backbuffer(game->display);
 al_use_shader(data->shader);
@@ -423,7 +497,8 @@ for (int x=0; x<80; x++) {
 {
 
 int x = data->x / 4; int y = data->y / 4;
-  al_draw_filled_rectangle(x*4, y*4, x*4+4, y*4+4, al_map_rgba(16,16,16,16));
+ if (!data->inmenu)
+	al_draw_filled_rectangle(x*4, y*4, x*4+4, y*4+4, al_map_rgba(16,16,16,16));
 }
 float x = 0; float width = 8;
 
@@ -436,16 +511,18 @@ al_draw_filled_rectangle(x, 180 - data->out[i][0] * 10, x+width, 180, al_map_rgb
 
 al_draw_filled_rectangle(0, 180-5, 320, 180, al_map_rgb(255,255,255));
 
-  al_draw_filled_rectangle(data->x - WIDTH, data->y - HEIGHT, data->x + WIDTH, data->y + HEIGHT,
+if (!data->inmenu){
+	al_draw_filled_rectangle(data->x - WIDTH, data->y - HEIGHT, data->x + WIDTH, data->y + HEIGHT,
 	                         //al_color_hsv(fabs(sin((data->rotation/360.0)+ALLEGRO_PI/4.0)) * 360, 1, 1));
 
 	                         al_map_rgb(255,255,0));
-
+}
+if (data->inmulti) {
 	al_draw_textf(data->font, al_map_rgb(255,255,255), 320/2, 72, ALLEGRO_ALIGN_CENTER, data->shakin_dudi ? (((data->shakin_dudi / 10) % 2) ? "" : "SCORE!") : "WAAAA");
 	al_draw_textf(data->font, al_map_rgb(255,255,255), 320/2, 82, ALLEGRO_ALIGN_CENTER, "%d:%d", data->score1, data->score2);
+}
 
-
-	al_set_target_bitmap(data->blurer);
+  al_set_target_bitmap(data->blurer);
 	al_clear_to_color(al_map_rgba(0,0,0,0));
 
 	al_draw_scaled_bitmap(data->pixelator, 0, 0, 320, 180, 0, 0, 320/4, 180/4, 0);
@@ -496,8 +573,21 @@ void Gamestate_ProcessEvent(struct Game *game, struct GamestateResources* data, 
 	// Called for each event in Allegro event queue.
 	// Here you can handle user input, expiring timers etc.
 	if ((ev->type==ALLEGRO_EVENT_KEY_DOWN) && (ev->keyboard.keycode == ALLEGRO_KEY_ESCAPE)) {
+
+		if (!data->inmenu) {
+			data->inmenu = true;
+			data->inmulti = false;
+			loadlevel(game, data, "levels/menu.lvl");
+		} else
 		UnloadCurrentGamestate(game); // mark this gamestate to be stopped and unloaded
 		// When there are no active gamestates, the engine will quit.
+	}
+
+	if ((ev->type==ALLEGRO_EVENT_KEY_DOWN) && (ev->keyboard.keycode == ALLEGRO_KEY_SPACE)) {
+		data->inmenu = false;
+		data->inmulti = true;
+		loadlevel(game, data, "levels/multi.lvl");
+
 	}
 
 	if (ev->type == ALLEGRO_EVENT_AUDIO_RECORDER_FRAGMENT) {
@@ -510,45 +600,19 @@ void Gamestate_ProcessEvent(struct Game *game, struct GamestateResources* data, 
 						*/
 
 		       ALLEGRO_AUDIO_RECORDER_EVENT *re = al_get_audio_recorder_event(ev);
-					 audio_buffer_t input = (audio_buffer_t) re->buffer;
-
-					 if (buffer) {
-						 free(buffer);
-					 }
-					 buffer = malloc(sizeof(uint8_t) * re->samples);
-					 memcpy(buffer, input, sizeof(uint8_t) * re->samples);
-
-data->samples = re->samples;
-
-
+data->inrecording = true;
+handleaudio(re->buffer, re->samples, data);
+data->inrecording = false;
 //					al_flip_display();
 	      }
 
 }
 
-void* Gamestate_Load(struct Game *game, void (*progress)(struct Game*)) {
-	// Called once, when the gamestate library is being loaded.
-	// Good place for allocating memory, loading bitmaps etc.
-	struct GamestateResources *data = malloc(sizeof(struct GamestateResources));
-	data->font = al_create_builtin_font();
-	progress(game); // report that we progressed with the loading, so the engine can draw a progress bar
+void loadlevel(struct Game *game, struct GamestateResources *data, char* name) {
+	ALLEGRO_FILE *file = al_fopen(GetDataFilePath(game, name), "r");
 
-	data->pixelator = al_create_bitmap(320, 180);
-	data->blurer = al_create_bitmap(320/4, 180/4);
-
-
-	data->r = al_create_audio_recorder(1000, samples_per_fragment, frequency,
-	                                   audio_depth, ALLEGRO_CHANNEL_CONF_1);
-
-	data->shader = al_create_shader(ALLEGRO_SHADER_GLSL);
-	PrintConsole(game, "VERTEX: %d", al_attach_shader_source_file(data->shader, ALLEGRO_VERTEX_SHADER, GetDataFilePath(game, "vertex.glsl")));
-	PrintConsole(game, "%s", al_get_shader_log(data->shader));
-	PrintConsole(game, "PIXEL: %d", al_attach_shader_source_file(data->shader, ALLEGRO_PIXEL_SHADER, GetDataFilePath(game, "pixel.glsl")));
-	PrintConsole(game, "%s", al_get_shader_log(data->shader));
-	al_build_shader(data->shader);
-
-
-	ALLEGRO_FILE *file = al_fopen(GetDataFilePath(game, "levels/multi.lvl"), "r");
+	data->score1 = 0;
+	data->score2 = 0;
 
 	char buf;
 
@@ -567,18 +631,68 @@ void* Gamestate_Load(struct Game *game, void (*progress)(struct Game*)) {
 		}
 	}
 
+	data->x = 320/2;
+	data->y = 120;
+	data->vx = 0;
+	data->vy = 0;
+
+	al_fclose(file);
+
+}
+
+void* Gamestate_Load(struct Game *game, void (*progress)(struct Game*)) {
+	// Called once, when the gamestate library is being loaded.
+	// Good place for allocating memory, loading bitmaps etc.
+	struct GamestateResources *data = malloc(sizeof(struct GamestateResources));
+	data->font = al_create_builtin_font();
+
+
+	data->point_sample = al_load_sample( GetDataFilePath(game, "point.flac") );
+	data->point = al_create_sample_instance(data->point_sample);
+	al_attach_sample_instance_to_mixer(data->point, game->audio.fx);
+	al_set_sample_instance_playmode(data->point, ALLEGRO_PLAYMODE_ONCE);
+
+
+	data->game = game;
+	progress(game); // report that we progressed with the loading, so the engine can draw a progress bar
+
+	data->pixelator = al_create_bitmap(320, 180);
+	data->blurer = al_create_bitmap(320/4, 180/4);
+
+
+	data->r = al_create_audio_recorder(1000, samples_per_fragment, frequency,
+	                                   audio_depth, ALLEGRO_CHANNEL_CONF_1);
+
+	data->shader = al_create_shader(ALLEGRO_SHADER_GLSL);
+	PrintConsole(game, "VERTEX: %d", al_attach_shader_source_file(data->shader, ALLEGRO_VERTEX_SHADER, GetDataFilePath(game, "vertex.glsl")));
+	PrintConsole(game, "%s", al_get_shader_log(data->shader));
+	PrintConsole(game, "PIXEL: %d", al_attach_shader_source_file(data->shader, ALLEGRO_PIXEL_SHADER, GetDataFilePath(game, "pixel.glsl")));
+	PrintConsole(game, "%s", al_get_shader_log(data->shader));
+	al_build_shader(data->shader);
+
+	loadlevel(game, data, "levels/menu.lvl");
+
 
 	al_register_event_source(game->_priv.event_queue, al_get_audio_recorder_event_source(data->r));
 
 al_start_audio_recorder(data->r);
-/*
-data->audio = al_load_audio_stream(GetDataFilePath(game, "menu.ogg"), 4, 1024);
+
+
+data->audio = al_load_audio_stream(GetDataFilePath(game, "waaaa.flac"), 4, 4096);
 //al_get_audio_stream_fragment(data->audio);
 
 al_register_event_source(game->_priv.event_queue, al_get_audio_stream_event_source(data->audio));
 al_set_audio_stream_playing(data->audio, true);
+al_set_audio_stream_playmode(data->audio, ALLEGRO_PLAYMODE_LOOP);
 al_attach_audio_stream_to_mixer(data->audio, game->audio.music);
-*/
+
+
+al_set_mixer_postprocess_callback(game->audio.music, *handleaudio, data);
+
+    //(ALLEGRO_MIXER *mixer,
+   //void (*pp_callback)(void *buf, unsigned int samples, void *data),
+   //void *pp_callback_userdata)
+
 data->out = NULL;
   return data;
 }
@@ -587,12 +701,18 @@ void Gamestate_Unload(struct Game *game, struct GamestateResources* data) {
 	// Called when the gamestate library is being unloaded.
 	// Good place for freeing all allocated memory and resources.
 	al_destroy_font(data->font);
+	al_destroy_audio_stream(data->audio);
+	al_destroy_audio_recorder(data->r);
 	free(data);
 }
 
 void Gamestate_Start(struct Game *game, struct GamestateResources* data) {
 	// Called when this gamestate gets control. Good place for initializing state,
 	// playing music etc.
+	data->screamtime = 0;
+	data->inmulti = false;
+	data->inmenu = true;
+	data->inrecording = false;
 	data->blink_counter = 0;
 data->shakin_dudi = 0;
   data->vx = 0;
@@ -606,6 +726,8 @@ data->shakin_dudi = 0;
 
 void Gamestate_Stop(struct Game *game, struct GamestateResources* data) {
 	// Called when gamestate gets stopped. Stop timers, music etc. here.
+	al_set_audio_stream_playing(data->audio, false);
+	al_stop_audio_recorder(data->r);
 }
 
 void Gamestate_Pause(struct Game *game, struct GamestateResources* data) {
