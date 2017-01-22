@@ -9,10 +9,10 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake" "${CMAKE_SOURCE_DIR}/l
 
 add_definitions(-DALLEGRO_UNSTABLE=1)
 
-find_package(FFTW REQUIRED)
-
 include(libsuperderpy)
 include(SetPaths)
+
+find_package(FFTW REQUIRED)
 
 add_subdirectory(libsuperderpy)
 add_subdirectory(src)
