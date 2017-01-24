@@ -273,6 +273,8 @@ int N = data->samples;
 		  in[i][1] = 0;
 	}
 
+	free(window);
+
 	p1 = fftw_plan_dft_1d(N, in, out, FFTW_FORWARD, FFTW_ESTIMATE);
 	fftw_execute(p1);
 float max = 0;
