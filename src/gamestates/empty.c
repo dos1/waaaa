@@ -775,6 +775,7 @@ void Gamestate_Unload(struct Game *game, struct GamestateResources* data) {
 	al_destroy_font(data->font);
 	al_destroy_audio_stream(data->audio);
 	al_destroy_audio_recorder(data->r);
+	free(data->out);
 	free(data);
 }
 
@@ -784,6 +785,7 @@ void Gamestate_Start(struct Game *game, struct GamestateResources* data) {
 	data->screamtime = 0;
 	data->inmulti = false;
 	data->inmenu = true;
+	data->rotation = 0;
 	data->inrecording = false;
 	data->blink_counter = 0;
 data->shakin_dudi = 0;
@@ -794,6 +796,8 @@ data->shakin_dudi = 0;
 
 	data->score1 = 0;
 	data->score2 = 0;
+
+data->samples = 0;
 }
 
 void Gamestate_Stop(struct Game *game, struct GamestateResources* data) {
