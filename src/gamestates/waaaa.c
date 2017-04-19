@@ -52,11 +52,12 @@ struct GamestateResources {
 		float ringbuffer[SAMPLE_RATE];
 		int ringpos;
 		float fftbuffer[FFT_SAMPLES];
+		float max_max;
 
 		ALLEGRO_BITMAP *pixelator, *blurer;
 		ALLEGRO_SHADER *shader;
 
-		int blink_counter;
+		int distortion;
 		float rotation;
 		int screamtime;
 		bool inmenu;
@@ -92,17 +93,57 @@ void Gamestate_Logic(struct Game *game, struct GamestateResources* data) {
 			pos = -1;
 		}
 	}
+
 	FFT(data->fftbuffer, FFT_SAMPLES, data);
 
-	for (int i=0; i<8192/2; i++) {
+	float gain = 0;
+	for (int i=0; i<BARS_NUM; i++) {
 		data->bars[i] = 0;
 		int width = 1;
 		for (int j=i*width; j<i*width+width; j++) {
 			data->bars[i] += data->fft[j+8*width];
+			if (gain < data->fft[j+8*width]) {
+				gain = data->fft[j+8*width];
+			}
 		}
 		data->bars[i] /= width;
-
 	}
+	data->distortion = gain * 2;
+	data->rotation += data->distortion * 4;
+
+	PrintConsole(game, "gain %f", gain);
+}
+
+void LoadLevel(struct Game *game, struct GamestateResources *data, char* name) {
+	ALLEGRO_FILE *file = al_fopen(GetDataFilePath(game, name), "r");
+
+	data->score1 = 0;
+	data->score2 = 0;
+
+	char buf;
+
+	int x = 0, y = 0;
+	while (al_fread(file, &buf, sizeof(char))) {
+		data->level[x][y] = buf;
+		if (buf!='\n') {
+			x++;
+			if (x==80) {
+				x=0;
+				y++;
+			}
+			if (y==45) {
+				break;
+			}
+		}
+	}
+
+	data->x = 320/2;
+	data->y = 120;
+	data->vx = 0;
+	data->vy = 0;
+
+	al_fclose(file);
+
 }
 
 void Gamestate_Draw(struct Game *game, struct GamestateResources* data) {
@@ -132,19 +173,19 @@ void Gamestate_Draw(struct Game *game, struct GamestateResources* data) {
 		width = 1;
 	}
 	width *= BARS_WIDTH;
-		for (int i=BARS_OFFSET; i<BARS_NUM; i++) {
-				int a = i-BARS_OFFSET;
-				al_draw_filled_rectangle(a*width, (int)(178 - data->bars[i]*90), a*width+width, 180, al_map_rgb(255,255,255));
+	for (int i=BARS_OFFSET; i<BARS_NUM; i++) {
+		int a = i-BARS_OFFSET;
+		al_draw_filled_rectangle(a*width, (int)(178 - data->bars[i]*90), a*width+width, 180, al_map_rgb(255,255,255));
 	}
 
-    /*
-    // WAVEFORM DRAWING
-    width=1;
+  /*
+  // WAVEFORM DRAWING
+  width=1;
 	for (int i=0; i<4096; i++) {
 		al_draw_filled_rectangle(i*width, 180/2 - data->fftbuffer[i]*180/2, i*width+width, 180/2, al_map_rgb(255,255,0));
 	}
 	al_draw_textf(data->font, al_map_rgb(255,255,255), 10, 10, ALLEGRO_ALIGN_LEFT, "%d", data->ringpos);
-		*/
+	*/
 
 	// FINAL DRAWING
 	al_set_target_bitmap(data->blurer);
@@ -154,7 +195,7 @@ void Gamestate_Draw(struct Game *game, struct GamestateResources* data) {
 
 	al_set_target_backbuffer(game->display);
 
-	float s = data->blink_counter / 5.0;
+	float s = data->distortion / 5.0;
 	ALLEGRO_COLOR tint = al_map_rgba(32*s,32*s,32*s,32*s);
 
 	float rot = sin(data->rotation / 20.0) / 20.0;
@@ -176,7 +217,7 @@ void Gamestate_Draw(struct Game *game, struct GamestateResources* data) {
 	al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 - 2, 180/2 - 120 - 3, 1.1*4*scale, 1.1*4*scale, rot, 0);
 	al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 + 2, 180/2 - 120 - 3, 1.1*4*scale, 1.1*4*scale, rot, 0);
 
-	float offset = data->blink_counter / 2.0 * (rand() / (float)INT_MAX);
+	float offset = data->distortion / 2.0 * (rand() / (float)INT_MAX);
 
 	al_draw_tinted_scaled_rotated_bitmap(data->pixelator, al_map_rgba(0,192,192, 192), 320/2, 180*(3/4), 320/2 - 2*offset, 180/2 - 120, 1.1*scale, 1.1*scale, rot, 0);
 	al_draw_tinted_scaled_rotated_bitmap(data->pixelator, al_map_rgba(192,0,0, 192), 320/2, 180*(3/4), 320/2 + 2*offset, 180/2 - 120, 1.1*scale, 1.1*scale, rot, 0);
@@ -189,127 +230,6 @@ void Gamestate_Draw(struct Game *game, struct GamestateResources* data) {
 	al_use_shader(NULL);
 
 }
-
-void Gamestate_Draw_Old(struct Game *game, struct GamestateResources* data) {
-	// Called as soon as possible, but no sooner than next Gamestate_Logic call.
-	// Draw everything to the screen here.
-	al_clear_to_color(al_map_rgb(0,0,0));
-
-	al_set_target_bitmap(data->pixelator);
-
-	al_clear_to_color(al_color_hsv(fabs(sin(data->rotation/360.0)) * 360, 0.75, 0.5 + sin(data->rotation/20.0)/20.0));
-	//al_draw_filled_rectangle(0, 180-data->screamtime, 320, 180, al_map_rgb(255,255,255));
-	al_draw_filled_rectangle(0, 0, 320, 180, al_map_rgba(data->screamtime, data->screamtime, data->screamtime, data->screamtime));
-
-al_set_target_backbuffer(game->display);
-al_use_shader(data->shader);
-al_set_shader_int("scaleFactor", 2);
-al_draw_bitmap(data->pixelator, 0, 0, 0);
-al_use_shader(NULL);
-
-al_set_target_bitmap(data->pixelator);
-al_clear_to_color(al_map_rgba(0,0,0,0));
-
-
-	if (data->blink_counter < 50) {
-		//al_draw_text(data->font, al_map_rgb(255,255,255), game->viewport.width / 2, game->viewport.height / 2,
-			//           ALLEGRO_ALIGN_CENTRE, "Nothing to see here, move along!");
-	}
-
-//if (!data->out) { return; }
-
-for (int x=0; x<80; x++) {
-	for (int y=0; y<45; y++) {
-		if (data->level[x][y]=='O') {
-			al_draw_filled_rectangle(x*4, y*4, x*4+4, y*4+4, al_map_rgb(255,255,255));
-		}
-		if (data->level[x][y]=='X') {
-			al_draw_filled_rectangle(x*4, y*4, x*4+4, y*4+4, al_map_rgba(0,0,32,32));
-		}
-		if (data->level[x][y]=='Y') {
-			al_draw_filled_rectangle(x*4, y*4, x*4+4, y*4+4, al_map_rgba(32,0,0,32));
-		}
-	}
-}
-{
-
-int x = data->x / 4; int y = data->y / 4;
- if (!data->inmenu)
-  al_draw_filled_rectangle(x*4, y*4, x*4+4, y*4+4, al_map_rgba(16,16,16,16));
-}
-float x = 0; float width = 8;
-
-int OFF = 0;
-if (data->inmenu) OFF = 15;
-
-for (int i = 8 + OFF; i <= 50 + OFF; i++) {
-width -= 0.02;
-
-// HERE DRAWING
-//al_draw_filled_rectangle(x, 180 - data->out[i][0] * 10, x+width, 180, al_map_rgb(255,255,255));
-	x+= width;
-}
-
-al_draw_filled_rectangle(0, 180-5, 320, 180, al_map_rgb(255,255,255));
-
-if (!data->inmenu){
-	al_draw_filled_rectangle(data->x - BALL_WIDTH, data->y - BALL_HEIGHT, data->x + BALL_WIDTH, data->y + BALL_HEIGHT,
-													 //al_color_hsv(fabs(sin((data->rotation/360.0)+ALLEGRO_PI/4.0)) * 360, 1, 1));
-
-													 al_map_rgb(255,255,0));
-}
-if (data->inmulti) {
-	al_draw_textf(data->font, al_map_rgb(255,255,255), 320/2, 72, ALLEGRO_ALIGN_CENTER, data->shakin_dudi ? (((data->shakin_dudi / 10) % 2) ? "" : "SCORE!") : "WAAAA");
-	al_draw_textf(data->font, al_map_rgb(255,255,255), 320/2, 82, ALLEGRO_ALIGN_CENTER, "%d:%d", data->score1, data->score2);
-}
-
-	al_set_target_bitmap(data->blurer);
-	al_clear_to_color(al_map_rgba(0,0,0,0));
-
-	al_draw_scaled_bitmap(data->pixelator, 0, 0, 320, 180, 0, 0, 320/4, 180/4, 0);
-
-
-al_set_target_backbuffer(game->display);
-//al_draw_bitmap(data->blurer, 0, 0, 0);
-
-float s = data->blink_counter / 5.0;
-ALLEGRO_COLOR tint = al_map_rgba(32*s,32*s,32*s,32*s);
-
-float rot = sin(data->rotation / 20.0) / 20.0;
-
-float scale = 1 - pow((fabs((320/2) - data->x) / (320/2.0)),2) * 0.1;
-
-al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2, 180/2 - 40, 1.1*4*scale, 1.1*4*scale, rot, 0);
-al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 + 2, 180/2 - 40, 1.1*4*scale, 1.1*4*scale, rot, 0);
-al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 - 2, 180/2 - 40, 1.1*4*scale, 1.1*4*scale, rot, 0);
-al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 - 2, 180/2 - 40 - 3, 1.1*4*scale, 1.1*4*scale, rot, 0);
-al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 + 2, 180/2 - 40 - 3, 1.1*4*scale, 1.1*4*scale, rot, 0);
-
-al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 + 2, 180/2 - 200, 1.1*4*scale, 1.1*4*scale, rot, 0);
-
-
-al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2, 180/2 - 120, 1.1*4*scale, 1.1*4*scale, rot, 0);
-al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 + 2, 180/2 - 120, 1.1*4*scale, 1.1*4*scale, rot, 0);
-al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 - 2, 180/2 - 120, 1.1*4*scale, 1.1*4*scale, rot, 0);
-al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 - 2, 180/2 - 120 - 3, 1.1*4*scale, 1.1*4*scale, rot, 0);
-al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 + 2, 180/2 - 120 - 3, 1.1*4*scale, 1.1*4*scale, rot, 0);
-
-float offset = data->blink_counter / 2.0 * (rand() / (float)INT_MAX);
-
-al_draw_tinted_scaled_rotated_bitmap(data->pixelator, al_map_rgba(0,192,192, 192), 320/2, 180*(3/4), 320/2 - 2*offset, 180/2 - 120, 1.1*scale, 1.1*scale, rot, 0);
-al_draw_tinted_scaled_rotated_bitmap(data->pixelator, al_map_rgba(192,0,0, 192), 320/2, 180*(3/4), 320/2 + 2*offset, 180/2 - 120, 1.1*scale, 1.1*scale, rot, 0);
-
-al_use_shader(data->shader);
-al_set_shader_int("scaleFactor", 1);
-
-al_draw_scaled_rotated_bitmap(data->pixelator, 320/2, 180*(3/4), 320/2, 180/2 - 120, 1.1*scale, 1.1*scale, rot, 0);
-
-al_use_shader(NULL);
-
-}
-
-
-float max_max = 0;
 
 void MixerPostprocess(void *buffer, unsigned int samples, void* userdata) {
 	// REMEMBER: don't use any drawing code inside this function
@@ -350,19 +270,19 @@ void FFT(void *buffer, unsigned int samples, void* userdata) {
 	}
 	min *= -1;
 	if (min > max) max = min;
-	if (max > max_max) max_max = max;
+	if (max > data->max_max) data->max_max = max;
 
 	for (int i = 0; i < samples; i++) {
-		in[i] = (buf[i] * window[i]) / max_max;
+		in[i] = (buf[i] * window[i]) / data->max_max;
 		//buf[i] = 0;
 		//PrintConsole(data->game, "%d: %f", i, buf[i]);
 	}
-	printf("samples: %d, min: %f, max: %f, max_max: %f\n", samples, min, max, max_max);
+	printf("samples: %d, min: %f, max: %f, max_max: %f\n", samples, min, max, data->max_max);
 	fflush(stdout);
 	free(window);
 
-	if (max < max_max) {
-		max_max -= (max_max - max) / 1024.0;
+	if (max < data->max_max) {
+		data->max_max -= (data->max_max - max) / 1024.0;
 	}
 
 	fftw_plan p = fftw_plan_dft_r2c_1d(samples, in, out, FFTW_ESTIMATE);
@@ -471,6 +391,7 @@ void Gamestate_Start(struct Game *game, struct GamestateResources* data) {
 	// Called when this gamestate gets control. Good place for initializing state,
 	// playing music etc.
 	data->ringpos = 0;
+	data->max_max = 0;
 	al_start_audio_recorder(data->recorder);
 }
 
