@@ -54,7 +54,7 @@ struct GamestateResources {
 		float fftbuffer[FFT_SAMPLES];
 		float max_max;
 
-		ALLEGRO_BITMAP *pixelator, *blurer;
+		ALLEGRO_BITMAP *pixelator, *blurer, *background;
 		ALLEGRO_SHADER *shader;
 
 		int distortion;
@@ -109,9 +109,188 @@ void Gamestate_Logic(struct Game *game, struct GamestateResources* data) {
 		data->bars[i] /= width;
 	}
 	data->distortion = gain * 2;
-	data->rotation += data->distortion * 4;
+	data->rotation += data->distortion * 3;
 
-	PrintConsole(game, "gain %f", gain);
+	//PrintConsole(game, "gain %f", gain);
+
+	// COLLISION HANDLING (sucks)
+
+	int oldx = data->x;
+	int oldy = data->y;
+
+
+	data->x += data->vx;
+	data->y += data->vy;
+
+	if (data->vx > 0) {
+		data->vx -= 0.005;
+	} else if (data->vx < 0) {
+		data->vx += 0.005;
+	}
+	data->vy += 0.05;
+
+	if (data->y > 180-BALL_HEIGHT-5) {
+		data->vy = -data->vy / 3;
+		data->y = 178-5;
+	}
+
+	if (data->x < 0) {
+		data->vx = -data->vx;
+		data->x = 0;
+	}
+	if (data->x > 320) {
+		data->vx = -data->vx;
+		data->x = 320;
+	}
+	if (data->y == 180-BALL_HEIGHT-5) {
+		if (data->vx > 0) {
+			data->vx -= 0.01;
+		} else if (data->vx < 0) {
+			data->vx += 0.01;
+		}
+	}
+
+
+	float x = 0; float width = 8;
+
+	for (int i = BARS_OFFSET; i <= 320/BARS_WIDTH + BARS_OFFSET; i++) {
+	width -= 0.02;
+	if (data->bars[i] != data->bars[i]) { // NaN
+		break;
+	}
+	int pos = 176 - data->bars[i]*64;
+	int prev = 176 - data->bars[i-1]*64;
+	int next = 176 - data->bars[i+1]*64;
+	//PrintConsole(game, "data->y %f, pos %d", data->y, pos);
+
+	if (data->y - BALL_HEIGHT >= pos) {
+
+		//PrintConsole(game, "i %d pos data->y %f pos %d out[i][0] %f", i, data->y, pos, out[i][0]);
+
+		if (x-1 == data->x) {
+			// left
+			data->vy = (pos - data->y) / 25;
+			data->vx += -1;
+			PrintConsole(game, "left bump %d", pos);
+			data->y = pos;
+		}
+		else if (x + width == data->x) {
+			// right
+			data->vy = (pos - data->y) / 25;
+			data->vx += 1;
+			data->y = pos;
+			PrintConsole(game, "right bump %d", pos);
+		}
+		else if ((x <= data->x) && (x + width >= data->x)) {
+			data->vy = (pos - data->y) / 25 - data->vy * 0.5;
+			data->vx += ((rand() / (float)RAND_MAX) - 0.5) * 2;
+			data->y = pos;
+			PrintConsole(game, "center bump %d", pos);
+
+			if ((prev < pos) && (next > pos)) {
+				data->vx += -1;
+			}
+			if ((prev > pos) && (next < pos)) {
+				data->vy += 1;
+			}
+		}
+
+	}
+
+
+//	al_draw_filled_rectangle(x, 180 - data->out[i][0] * 10, x+width, 180, al_map_rgb(255,255,255));
+		x+= width;
+	}
+
+
+	// collision with level
+
+	int oldsx = (int)(oldx / 4);
+	int oldsy = (int)(oldy / 4);
+
+	int sx = (int)(data->x /4);
+	int sy = (int)(data->y /4);
+
+	int tx = oldsx; int ty = oldsy;
+
+	int colx = sx; int coly = sy;
+
+	while ((tx != sx) && (ty != sy)) {
+		if (data->level[tx][ty] == '0') {
+			colx = tx;
+			coly = ty;
+			break;
+		}
+
+		if (tx != sx) { if (sx > tx) tx++; else tx--; }
+		if (ty != sy) { if (sy > ty) ty++; else ty--; }
+	}
+
+	if ((data->level[colx][coly] == 'X') || (data->level[colx][coly] == 'Y')) {
+		data->vx = 0;
+		data->vy = 0;
+		data->x = 320/2;
+		data->y = 120;
+
+		data->shakin_dudi=120;
+
+		if (data->level[colx][coly] == 'X') {
+			data->score1 ++;
+		} else {
+			data->score2 ++;
+		}
+
+//		al_play_sample_instance(data->point);
+
+	}
+
+	if (data->level[colx][coly] == 'O') {
+		if (data->x != colx * 4) {
+			data->distortion=3;
+		}
+		if (data->y != coly * 4) {
+			data->distortion=3;
+		}
+			data->x = oldsx * 4;
+			data->y = oldsy * 4;
+/*		if (data->vx > 0) {
+			data->x = -4;
+		} else {
+			data->x = +4;
+		}
+		if (data->vy > 0) {
+			data->y = -4;
+		} else {
+			data->y = +4;
+		}*/
+		PrintConsole(game, "collision %d %d", (int)(data->x / 4), (int)(data->y / 4));
+
+		data->vx = -data->vx * 0.5;
+		data->vy = -data->vy * 0.5;
+
+		if (fabs(data->vx) < 0.2) {
+			data->vx *= 10;
+		}
+		if (fabs(data->vy) < 0.2) {
+			data->vy *= 10;
+		}
+
+		if ((data->x == oldx) && (data->y == oldy)) {
+			// we're stuck! RANDOMMMMM and hope for the best
+			data->vx = ((rand() / (float)RAND_MAX) - 0.5) * 5;
+			data->vy = ((rand() / (float)RAND_MAX) - 0.5) * 5;
+		}
+	}
+
+
+	data->vx += sin(data->rotation / 20.0) / 100.0;
+
+	if (data->shakin_dudi) {
+		data->distortion = (rand() / (float)RAND_MAX) * 15;
+		data->rotation+=data->distortion;
+		data->shakin_dudi--;
+	}
+
 }
 
 void LoadLevel(struct Game *game, struct GamestateResources *data, char* name) {
@@ -167,6 +346,24 @@ void Gamestate_Draw(struct Game *game, struct GamestateResources* data) {
 	al_set_target_bitmap(data->pixelator);
 	al_clear_to_color(al_map_rgba(0,0,0,0));
 
+	// LEVEL DRAWING
+	for (int x=0; x<80; x++) {
+		for (int y=0; y<45; y++) {
+			if (data->level[x][y]=='O') {
+				al_draw_filled_rectangle(x*4, y*4, x*4+4, y*4+4, al_map_rgb(255,255,255));
+			}
+			if (data->level[x][y]=='X') {
+				al_draw_filled_rectangle(x*4, y*4, x*4+4, y*4+4, al_map_rgba(0,0,32,32));
+			}
+			if (data->level[x][y]=='Y') {
+				al_draw_filled_rectangle(x*4, y*4, x*4+4, y*4+4, al_map_rgba(32,0,0,32));
+			}
+			if (data->level[x][y]=='a') {
+				al_draw_filled_rectangle(x*4, y*4, x*4+4, y*4+4, al_map_rgba(64,64,64,64));
+			}
+		}
+	}
+
 	// BAR DRAWING
 	int width = 320/BARS_NUM;
 	if (width==0) {
@@ -175,7 +372,10 @@ void Gamestate_Draw(struct Game *game, struct GamestateResources* data) {
 	width *= BARS_WIDTH;
 	for (int i=BARS_OFFSET; i<BARS_NUM; i++) {
 		int a = i-BARS_OFFSET;
-		al_draw_filled_rectangle(a*width, (int)(178 - data->bars[i]*90), a*width+width, 180, al_map_rgb(255,255,255));
+		al_draw_filled_rectangle(a*width, (int)(176 - data->bars[i]*64), a*width+width, 180, al_map_rgb(255,255,255));
+		if (a*width > game->viewport.width) {
+			break;
+		}
 	}
 
   /*
@@ -187,13 +387,27 @@ void Gamestate_Draw(struct Game *game, struct GamestateResources* data) {
 	al_draw_textf(data->font, al_map_rgb(255,255,255), 10, 10, ALLEGRO_ALIGN_LEFT, "%d", data->ringpos);
 	*/
 
+	// BALL DRAWING
+//	if (!data->inmenu){
+	al_draw_textf(data->font, al_map_rgb(255,255,255), 320/2, 72, ALLEGRO_ALIGN_CENTER, data->shakin_dudi ? (((data->shakin_dudi / 10) % 2) ? "" : "SCORE!") : "WAAAA");
+
+	al_draw_filled_rectangle(data->x - BALL_WIDTH, data->y - BALL_HEIGHT, data->x + BALL_WIDTH, data->y + BALL_HEIGHT,
+														 //al_color_hsv(fabs(sin((data->rotation/360.0)+ALLEGRO_PI/4.0)) * 360, 1, 1));
+
+														 al_map_rgb(255,255,0));
+//	}
+	// UI DRAWING
+//	if (data->inmulti) {
+	//	al_draw_textf(data->font, al_map_rgb(255,255,255), 320/2, 82, ALLEGRO_ALIGN_CENTER, "%d:%d", data->score1, data->score2);
+//	}
+
+
 	// FINAL DRAWING
 	al_set_target_bitmap(data->blurer);
 	al_clear_to_color(al_map_rgba(0,0,0,0));
 
 	al_draw_scaled_bitmap(data->pixelator, 0, 0, 320, 180, 0, 0, 320/4, 180/4, 0);
 
-	al_set_target_backbuffer(game->display);
 
 	float s = data->distortion / 5.0;
 	ALLEGRO_COLOR tint = al_map_rgba(32*s,32*s,32*s,32*s);
@@ -201,6 +415,9 @@ void Gamestate_Draw(struct Game *game, struct GamestateResources* data) {
 	float rot = sin(data->rotation / 20.0) / 20.0;
 
 	float scale = 1 - pow((fabs((320/2) - data->x) / (320/2.0)),2) * 0.1;
+
+	al_set_target_bitmap(data->background);
+	al_clear_to_color(al_map_rgba(0,0,0,0));
 
 	al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2, 180/2 - 40, 1.1*4*scale, 1.1*4*scale, rot, 0);
 	al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 + 2, 180/2 - 40, 1.1*4*scale, 1.1*4*scale, rot, 0);
@@ -210,22 +427,24 @@ void Gamestate_Draw(struct Game *game, struct GamestateResources* data) {
 
 	al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 + 2, 180/2 - 200, 1.1*4*scale, 1.1*4*scale, rot, 0);
 
+	al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2, 180/2 - 110, 1.1*4*scale, 1.1*4*scale, rot, 0);
+	al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 + 2, 180/2 - 110, 1.1*4*scale, 1.1*4*scale, rot, 0);
+	al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 - 2, 180/2 - 110, 1.1*4*scale, 1.1*4*scale, rot, 0);
+	al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 - 2, 180/2 - 110 - 3, 1.1*4*scale, 1.1*4*scale, rot, 0);
+	al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 + 2, 180/2 - 110 - 3, 1.1*4*scale, 1.1*4*scale, rot, 0);
 
-	al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2, 180/2 - 120, 1.1*4*scale, 1.1*4*scale, rot, 0);
-	al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 + 2, 180/2 - 120, 1.1*4*scale, 1.1*4*scale, rot, 0);
-	al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 - 2, 180/2 - 120, 1.1*4*scale, 1.1*4*scale, rot, 0);
-	al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 - 2, 180/2 - 120 - 3, 1.1*4*scale, 1.1*4*scale, rot, 0);
-	al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 + 2, 180/2 - 120 - 3, 1.1*4*scale, 1.1*4*scale, rot, 0);
+	al_set_target_backbuffer(game->display);
+	al_draw_bitmap(data->background, 0, 0, 0);
 
-	float offset = data->distortion / 2.0 * (rand() / (float)INT_MAX);
+	float offset = data->distortion / 2.0 * (rand() / (float)RAND_MAX);
 
-	al_draw_tinted_scaled_rotated_bitmap(data->pixelator, al_map_rgba(0,192,192, 192), 320/2, 180*(3/4), 320/2 - 2*offset, 180/2 - 120, 1.1*scale, 1.1*scale, rot, 0);
-	al_draw_tinted_scaled_rotated_bitmap(data->pixelator, al_map_rgba(192,0,0, 192), 320/2, 180*(3/4), 320/2 + 2*offset, 180/2 - 120, 1.1*scale, 1.1*scale, rot, 0);
+	al_draw_tinted_scaled_rotated_bitmap(data->pixelator, al_map_rgba(0,192,192, 192), 320/2, 180*(3/4), 320/2 - 2*offset, 180/2 - 110, 1.1*scale, 1.1*scale, rot, 0);
+	al_draw_tinted_scaled_rotated_bitmap(data->pixelator, al_map_rgba(192,0,0, 192), 320/2, 180*(3/4), 320/2 + 2*offset, 180/2 - 110, 1.1*scale, 1.1*scale, rot, 0);
 
 	al_use_shader(data->shader);
 	al_set_shader_int("scaleFactor", 1);
 
-	al_draw_scaled_rotated_bitmap(data->pixelator, 320/2, 180*(3/4), 320/2, 180/2 - 120, 1.1*scale, 1.1*scale, rot, 0);
+	al_draw_scaled_rotated_bitmap(data->pixelator, 320/2, 180*(3/4), 320/2, 180/2 - 110, 1.1*scale, 1.1*scale, rot, 0);
 
 	al_use_shader(NULL);
 
@@ -277,7 +496,7 @@ void FFT(void *buffer, unsigned int samples, void* userdata) {
 		//buf[i] = 0;
 		//PrintConsole(data->game, "%d: %f", i, buf[i]);
 	}
-	printf("samples: %d, min: %f, max: %f, max_max: %f\n", samples, min, max, data->max_max);
+	//printf("samples: %d, min: %f, max: %f, max_max: %f\n", samples, min, max, data->max_max);
 	fflush(stdout);
 	free(window);
 
@@ -339,7 +558,7 @@ void* Gamestate_Load(struct Game *game, void (*progress)(struct Game*)) {
 		data->ringbuffer[i] = 0;
 	}
 
-		data->music_mode = false;
+	data->music_mode = false;
 
 	data->mixer = al_create_mixer(SAMPLE_RATE, ALLEGRO_AUDIO_DEPTH_FLOAT32, ALLEGRO_CHANNEL_CONF_2);
 	al_attach_mixer_to_mixer(data->mixer, game->audio.music);
@@ -363,6 +582,7 @@ void* Gamestate_Load(struct Game *game, void (*progress)(struct Game*)) {
 	}
 
 	data->pixelator = al_create_bitmap(320, 180);
+	data->background = al_create_bitmap(320, 180);
 	data->blurer = al_create_bitmap(320/4, 180/4);
 
 	data->shader = al_create_shader(ALLEGRO_SHADER_GLSL);
@@ -393,6 +613,16 @@ void Gamestate_Start(struct Game *game, struct GamestateResources* data) {
 	data->ringpos = 0;
 	data->max_max = 0;
 	al_start_audio_recorder(data->recorder);
+	LoadLevel(game, data, "levels/multi.lvl");
+
+	data->distortion = 0;
+	data->rotation = 0;
+	data->screamtime = 0;
+	data->inmenu = true;
+	data->inmulti = false;
+	data->shakin_dudi = 0;
+	data->score1 = 0;
+	data->score2 = 0;
 }
 
 void Gamestate_Stop(struct Game *game, struct GamestateResources* data) {
