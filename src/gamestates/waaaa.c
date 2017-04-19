@@ -57,6 +57,9 @@ struct GamestateResources {
 		ALLEGRO_BITMAP *pixelator, *blurer, *background;
 		ALLEGRO_SHADER *shader;
 
+		ALLEGRO_SAMPLE_INSTANCE *point;
+		ALLEGRO_SAMPLE *point_sample;
+
 		int distortion;
 		float rotation;
 		int screamtime;
@@ -240,7 +243,7 @@ void Gamestate_Logic(struct Game *game, struct GamestateResources* data) {
 			data->score2 ++;
 		}
 
-//		al_play_sample_instance(data->point);
+		al_play_sample_instance(data->point);
 
 	}
 
@@ -588,6 +591,12 @@ void* Gamestate_Load(struct Game *game, void (*progress)(struct Game*)) {
 	data->pixelator = al_create_bitmap(320, 180);
 	data->background = al_create_bitmap(320, 180);
 	data->blurer = al_create_bitmap(320/4, 180/4);
+
+	data->point_sample = al_load_sample( GetDataFilePath(game, "point.flac") );
+	data->point = al_create_sample_instance(data->point_sample);
+	al_set_sample_instance_gain(data->point, 1.5);
+	al_attach_sample_instance_to_mixer(data->point, game->audio.fx);
+	al_set_sample_instance_playmode(data->point, ALLEGRO_PLAYMODE_ONCE);
 
 	data->shader = al_create_shader(ALLEGRO_SHADER_GLSL);
 	PrintConsole(game, "VERTEX: %d", al_attach_shader_source_file(data->shader, ALLEGRO_VERTEX_SHADER, GetDataFilePath(game, "vertex.glsl")));
