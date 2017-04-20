@@ -508,8 +508,8 @@ void FFT(void *buffer, unsigned int samples, void* userdata) {
 		//buf[i] = 0;
 		//PrintConsole(data->game, "%d: %f", i, buf[i]);
 	}
-	PrintConsole(data->game, "samples: %d, min: %f, max: %f, max_max: %f", samples, min, max, data->max_max);
-	fflush(stdout);
+	//PrintConsole(data->game, "samples: %d, min: %f, max: %f, max_max: %f", samples, min, max, data->max_max);
+	//fflush(stdout);
 	free(window);
 
 	if (max < data->max_max) {
