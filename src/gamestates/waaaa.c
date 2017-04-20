@@ -285,6 +285,11 @@ void Gamestate_Logic(struct Game *game, struct GamestateResources* data) {
 		}
 	}
 
+	if (data->level[colx][coly] == '!') {
+		data->x = 320/2;
+		data->y = 120;
+	}
+
 
 	data->vx += sin(data->rotation / 20.0) / 100.0;
 
