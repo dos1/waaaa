@@ -172,29 +172,29 @@ void Gamestate_Logic(struct Game *game, struct GamestateResources* data) {
 
 		if (x-1 == data->x) {
 			// left
-			data->vy = (pos - data->y) / 25;
-			data->vx += -1;
+			data->vy = (pos - data->y) / 15;
+			data->vx += -2;
 			PrintConsole(game, "left bump %d", pos);
 			data->y = pos;
 		}
 		else if (x + width == data->x) {
 			// right
-			data->vy = (pos - data->y) / 25;
-			data->vx += 1;
+			data->vy = (pos - data->y) / 15;
+			data->vx += 2;
 			data->y = pos;
 			PrintConsole(game, "right bump %d", pos);
 		}
 		else if ((x <= data->x) && (x + width >= data->x)) {
-			data->vy = (pos - data->y) / 25 - data->vy * 0.5;
+			data->vy = (pos - data->y) / 15 - data->vy * 0.5;
 			data->vx += ((rand() / (float)RAND_MAX) - 0.5) * 2;
 			data->y = pos;
 			PrintConsole(game, "center bump %d", pos);
 
 			if ((prev < pos) && (next > pos)) {
-				data->vx += -1;
+				data->vx += -2;
 			}
 			if ((prev > pos) && (next < pos)) {
-				data->vy += 1;
+				data->vy += 2;
 			}
 		}
 
@@ -291,7 +291,7 @@ void Gamestate_Logic(struct Game *game, struct GamestateResources* data) {
 	}
 
 
-	data->vx += sin(data->rotation / 20.0) / 100.0;
+	data->vx += sin(data->rotation / 20.0) / 75.0;
 
 	if (data->shakin_dudi) {
 		data->distortion = (rand() / (float)RAND_MAX) * 15;
