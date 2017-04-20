@@ -190,7 +190,7 @@ void Gamestate_Logic(struct Game *game, struct GamestateResources* data) {
 			data->vy = (pos - data->y) / 15 - data->vy * 0.5;
 			data->vx += ((rand() / (float)RAND_MAX) - 0.5) * 2;
 			data->y = pos;
-			PrintConsole(game, "center bump %d", pos);
+			//PrintConsole(game, "center bump %d", pos);
 
 			if ((prev < pos) && (next > pos)) {
 				data->vx += -2;
@@ -508,7 +508,7 @@ void FFT(void *buffer, unsigned int samples, void* userdata) {
 		//buf[i] = 0;
 		//PrintConsole(data->game, "%d: %f", i, buf[i]);
 	}
-	//printf("samples: %d, min: %f, max: %f, max_max: %f\n", samples, min, max, data->max_max);
+	printf("samples: %d, min: %f, max: %f, max_max: %f\n", samples, min, max, data->max_max);
 	fflush(stdout);
 	free(window);
 
