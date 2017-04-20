@@ -408,7 +408,7 @@ void Gamestate_Draw(struct Game *game, struct GamestateResources* data) {
 //	}
 	// UI DRAWING
 //	if (data->inmulti) {
-	  al_draw_textf(data->font, al_map_rgb(255,255,255), 320/2, 82, ALLEGRO_ALIGN_CENTER, "%d:%d", data->score2, data->score1);
+		al_draw_textf(data->font, al_map_rgb(255,255,255), 320/2, 82, ALLEGRO_ALIGN_CENTER, "%d:%d", data->score1, data->score2);
 //	}
 
 
@@ -508,15 +508,15 @@ void FFT(void *buffer, unsigned int samples, void* userdata) {
 		//buf[i] = 0;
 		//PrintConsole(data->game, "%d: %f", i, buf[i]);
 	}
-	//PrintConsole(data->game, "samples: %d, min: %f, max: %f, max_max: %f", samples, min, max, data->max_max);
+	PrintConsole(data->game, "samples: %d, min: %f, max: %f, max_max: %f", samples, min, max, data->max_max);
 	//fflush(stdout);
 	free(window);
 
 	if (max < data->max_max) {
 		data->max_max -= (data->max_max - max) / 1024.0;
 	}
-	if (data->max_max < 0.042) {
-		data->max_max = 0.042; // reboot develop setting
+	if (data->max_max < 0.1) {
+		data->max_max = 0.1; // reboot develop setting
 	}
 
 	fftw_plan p = fftw_plan_dft_r2c_1d(samples, in, out, FFTW_ESTIMATE);
