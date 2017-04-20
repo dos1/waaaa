@@ -592,7 +592,10 @@ void Gamestate_ProcessEvent(struct Game *game, struct GamestateResources* data, 
 		// When there are no active gamestates, the engine will quit.
 	}
 	if ((ev->type==ALLEGRO_EVENT_KEY_DOWN) && (ev->keyboard.keycode == ALLEGRO_KEY_SPACE)) {
-		LoadLevel(game, data, "levels/multi.lvl");
+		data->x = 320/2;
+		data->y = 120;
+		data->vx = 0;
+		data->vy = 0;
 	}
 	if ((ev->type==ALLEGRO_EVENT_KEY_DOWN) && (ev->keyboard.keycode == ALLEGRO_KEY_R)) {
 		data->score1 = 0;
