@@ -33,6 +33,8 @@
 #define BARS_WIDTH 4
 #define BARS_OFFSET 8
 
+#define MAX_MAX_LIMIT 0.042
+
 const int BALL_WIDTH = 3;
 const int BALL_HEIGHT = 3;
 
@@ -75,11 +77,15 @@ struct GamestateResources {
 
 		struct Game *game;
 		bool music_mode;
+
+		bool demo_mode;
+		int blink_counter;
 };
 
 int Gamestate_ProgressCount = 1; // number of loading steps as reported by Gamestate_Load
 
 void FFT(void *buffer, unsigned int samples, void* userdata);
+void LoadLevel(struct Game *game, struct GamestateResources *data, char* name);
 
 void Gamestate_Logic(struct Game *game, struct GamestateResources* data) {
 	// Called 60 times per second. Here you should do all your game logic.
@@ -301,6 +307,27 @@ void Gamestate_Logic(struct Game *game, struct GamestateResources* data) {
 		data->shakin_dudi--;
 	}
 
+	if (data->max_max <= MAX_MAX_LIMIT + 0.001) {
+		if (!data->demo_mode) {
+			// start demo mode
+			PrintConsole(game, "starting` demo");
+			data->demo_mode = true;
+			LoadLevel(game, data, "levels/menu.lvl");
+		}
+	} else {
+		if (data->demo_mode) {
+			// stop demo mode
+			PrintConsole(game, "out of demo at %f", data->max_max);
+			data->demo_mode = false;
+			LoadLevel(game, data, "levels/multi.lvl");
+			data->score1 = 0;
+			data->score2 = 0;
+		}
+	}
+	data->blink_counter++;
+	if (data->blink_counter >= 60) {
+					data->blink_counter = 0;
+	}
 }
 
 void LoadLevel(struct Game *game, struct GamestateResources *data, char* name) {
@@ -399,7 +426,9 @@ void Gamestate_Draw(struct Game *game, struct GamestateResources* data) {
 
 	// BALL DRAWING
 //	if (!data->inmenu){
-	al_draw_textf(data->font, al_map_rgb(255,255,255), 320/2, 72, ALLEGRO_ALIGN_CENTER, data->shakin_dudi ? (((data->shakin_dudi / 10) % 2) ? "" : "SCORE!") : "WAAAA");
+	if (!data->demo_mode) {
+		al_draw_textf(data->font, al_map_rgb(255,255,255), 320/2, 72, ALLEGRO_ALIGN_CENTER, data->shakin_dudi ? (((data->shakin_dudi / 10) % 2) ? "" : "SCORE!") : "WAAAA");
+	}
 
 	al_draw_filled_rectangle(data->x - BALL_WIDTH, data->y - BALL_HEIGHT, data->x + BALL_WIDTH, data->y + BALL_HEIGHT,
 	                           //al_color_hsv(fabs(sin((data->rotation/360.0)+ALLEGRO_PI/4.0)) * 360, 1, 1));
@@ -408,7 +437,14 @@ void Gamestate_Draw(struct Game *game, struct GamestateResources* data) {
 //	}
 	// UI DRAWING
 //	if (data->inmulti) {
+	if (!data->demo_mode) {
 		al_draw_textf(data->font, al_map_rgb(255,255,255), 320/2, 82, ALLEGRO_ALIGN_CENTER, "%d:%d", data->score1, data->score2);
+	}
+	if (data->demo_mode) {
+		if (data->blink_counter < 50) {
+			al_draw_text(data->font, al_map_rgb(255,255,255), 320/2, 126, ALLEGRO_ALIGN_CENTER, "GRAB A MICROPHONE AND PLAY!");
+		}
+	}
 //	}
 
 
@@ -508,15 +544,15 @@ void FFT(void *buffer, unsigned int samples, void* userdata) {
 		//buf[i] = 0;
 		//PrintConsole(data->game, "%d: %f", i, buf[i]);
 	}
-	PrintConsole(data->game, "samples: %d, min: %f, max: %f, max_max: %f", samples, min, max, data->max_max);
+	//PrintConsole(data->game, "samples: %d, min: %f, max: %f, max_max: %f", samples, min, max, data->max_max);
 	//fflush(stdout);
 	free(window);
 
 	if (max < data->max_max) {
 		data->max_max -= (data->max_max - max) / 1024.0;
 	}
-	if (data->max_max < 0.042) {
-		data->max_max = 0.042; // reboot develop setting
+	if (data->max_max < MAX_MAX_LIMIT) {
+		data->max_max = MAX_MAX_LIMIT; // reboot develop setting
 	}
 
 	fftw_plan p = fftw_plan_dft_r2c_1d(samples, in, out, FFTW_ESTIMATE);
@@ -650,9 +686,10 @@ void Gamestate_Start(struct Game *game, struct GamestateResources* data) {
 	// Called when this gamestate gets control. Good place for initializing state,
 	// playing music etc.
 	data->ringpos = 0;
-	data->max_max = 0;
+	data->max_max = MAX_MAX_LIMIT;
+	data->demo_mode = true;
 	al_start_audio_recorder(data->recorder);
-	LoadLevel(game, data, "levels/multi.lvl");
+	LoadLevel(game, data, "levels/menu.lvl");
 
 	data->distortion = 0;
 	data->rotation = 0;
