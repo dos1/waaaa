@@ -515,8 +515,8 @@ void FFT(void *buffer, unsigned int samples, void* userdata) {
 	if (max < data->max_max) {
 		data->max_max -= (data->max_max - max) / 1024.0;
 	}
-	if (data->max_max < 0.1) {
-		data->max_max = 0.1; // reboot develop setting
+	if (data->max_max < 0.042) {
+		data->max_max = 0.042; // reboot develop setting
 	}
 
 	fftw_plan p = fftw_plan_dft_r2c_1d(samples, in, out, FFTW_ESTIMATE);
