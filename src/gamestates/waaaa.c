@@ -154,10 +154,10 @@ void Gamestate_Logic(struct Game *game, struct GamestateResources* data) {
 	}
 
 
-	float x = 0; float width = 8;
+	float x = 0; float width = BARS_WIDTH;
 
 	for (int i = BARS_OFFSET; i <= 320/BARS_WIDTH + BARS_OFFSET; i++) {
-	width -= 0.02;
+	//width -= 0.02;
 	if (data->bars[i] != data->bars[i]) { // NaN
 		break;
 	}
@@ -202,7 +202,7 @@ void Gamestate_Logic(struct Game *game, struct GamestateResources* data) {
 
 
 //	al_draw_filled_rectangle(x, 180 - data->out[i][0] * 10, x+width, 180, al_map_rgb(255,255,255));
-		x+= width;
+	  x+= width;
 	}
 
 
@@ -254,7 +254,7 @@ void Gamestate_Logic(struct Game *game, struct GamestateResources* data) {
 		if (data->y != coly * 4) {
 			data->distortion=3;
 		}
-			data->x = oldsx * 4;
+		  data->x = oldsx * 4;
 			data->y = oldsy * 4;
 /*		if (data->vx > 0) {
 			data->x = -4;
@@ -299,8 +299,8 @@ void Gamestate_Logic(struct Game *game, struct GamestateResources* data) {
 void LoadLevel(struct Game *game, struct GamestateResources *data, char* name) {
 	ALLEGRO_FILE *file = al_fopen(GetDataFilePath(game, name), "r");
 
-	data->score1 = 0;
-	data->score2 = 0;
+//	data->score1 = 0;
+//	data->score2 = 0;
 
 	char buf;
 
@@ -381,9 +381,9 @@ void Gamestate_Draw(struct Game *game, struct GamestateResources* data) {
 		}
 	}
 
-  /*
-  // WAVEFORM DRAWING
-  width=1;
+	/*
+	// WAVEFORM DRAWING
+	width=1;
 	for (int i=0; i<4096; i++) {
 		al_draw_filled_rectangle(i*width, 180/2 - data->fftbuffer[i]*180/2, i*width+width, 180/2, al_map_rgb(255,255,0));
 	}
@@ -395,13 +395,13 @@ void Gamestate_Draw(struct Game *game, struct GamestateResources* data) {
 	al_draw_textf(data->font, al_map_rgb(255,255,255), 320/2, 72, ALLEGRO_ALIGN_CENTER, data->shakin_dudi ? (((data->shakin_dudi / 10) % 2) ? "" : "SCORE!") : "WAAAA");
 
 	al_draw_filled_rectangle(data->x - BALL_WIDTH, data->y - BALL_HEIGHT, data->x + BALL_WIDTH, data->y + BALL_HEIGHT,
-														 //al_color_hsv(fabs(sin((data->rotation/360.0)+ALLEGRO_PI/4.0)) * 360, 1, 1));
+	                           //al_color_hsv(fabs(sin((data->rotation/360.0)+ALLEGRO_PI/4.0)) * 360, 1, 1));
 
-														 al_map_rgb(255,255,0));
+	                           al_map_rgb(255,255,0));
 //	}
 	// UI DRAWING
 //	if (data->inmulti) {
-	//	al_draw_textf(data->font, al_map_rgb(255,255,255), 320/2, 82, ALLEGRO_ALIGN_CENTER, "%d:%d", data->score1, data->score2);
+	  al_draw_textf(data->font, al_map_rgb(255,255,255), 320/2, 82, ALLEGRO_ALIGN_CENTER, "%d:%d", data->score2, data->score1);
 //	}
 
 
@@ -545,6 +545,10 @@ void Gamestate_ProcessEvent(struct Game *game, struct GamestateResources* data, 
 	}
 	if ((ev->type==ALLEGRO_EVENT_KEY_DOWN) && (ev->keyboard.keycode == ALLEGRO_KEY_SPACE)) {
 		LoadLevel(game, data, "levels/multi.lvl");
+	}
+	if ((ev->type==ALLEGRO_EVENT_KEY_DOWN) && (ev->keyboard.keycode == ALLEGRO_KEY_R)) {
+		data->score1 = 0;
+		data->score2 = 0;
 	}
 
 
