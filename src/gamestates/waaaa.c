@@ -71,6 +71,8 @@ struct GamestateResources {
 		int score1, score2;
 		char level[80][45];
 
+		int yoffset;
+
 		struct Game *game;
 		bool music_mode;
 };
@@ -435,24 +437,26 @@ void Gamestate_Draw(struct Game *game, struct GamestateResources* data) {
 
 	al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 + 2, 180/2 - 200, 1.1*4*scale, 1.1*4*scale, rot, 0);
 
-	al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2, 180/2 - 110, 1.1*4*scale, 1.1*4*scale, rot, 0);
-	al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 + 2, 180/2 - 110, 1.1*4*scale, 1.1*4*scale, rot, 0);
-	al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 - 2, 180/2 - 110, 1.1*4*scale, 1.1*4*scale, rot, 0);
-	al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 - 2, 180/2 - 110 - 3, 1.1*4*scale, 1.1*4*scale, rot, 0);
-	al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 + 2, 180/2 - 110 - 3, 1.1*4*scale, 1.1*4*scale, rot, 0);
+	int yoffset = data->yoffset;
+
+	al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2, 180/2 - 120 + yoffset, 1.1*4*scale, 1.1*4*scale, rot, 0);
+	al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 + 2, 180/2 - 120 + yoffset, 1.1*4*scale, 1.1*4*scale, rot, 0);
+	al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 - 2, 180/2 - 120 + yoffset, 1.1*4*scale, 1.1*4*scale, rot, 0);
+	al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 - 2, 180/2 - 120 + yoffset - 3, 1.1*4*scale, 1.1*4*scale, rot, 0);
+	al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 + 2, 180/2 - 120 + yoffset - 3, 1.1*4*scale, 1.1*4*scale, rot, 0);
 
 	al_set_target_backbuffer(game->display);
 	al_draw_bitmap(data->background, 0, 0, 0);
 
 	float offset = data->distortion / 2.0 * (rand() / (float)RAND_MAX);
 
-	al_draw_tinted_scaled_rotated_bitmap(data->pixelator, al_map_rgba(0,192,192, 192), 320/2, 180*(3/4), 320/2 - 2*offset, 180/2 - 110, 1.1*scale, 1.1*scale, rot, 0);
-	al_draw_tinted_scaled_rotated_bitmap(data->pixelator, al_map_rgba(192,0,0, 192), 320/2, 180*(3/4), 320/2 + 2*offset, 180/2 - 110, 1.1*scale, 1.1*scale, rot, 0);
+	al_draw_tinted_scaled_rotated_bitmap(data->pixelator, al_map_rgba(0,192,192, 192), 320/2, 180*(3/4), 320/2 - 2*offset, 180/2 - 120 + yoffset, 1.1*scale, 1.1*scale, rot, 0);
+	al_draw_tinted_scaled_rotated_bitmap(data->pixelator, al_map_rgba(192,0,0, 192), 320/2, 180*(3/4), 320/2 + 2*offset, 180/2 - 120 + yoffset, 1.1*scale, 1.1*scale, rot, 0);
 
 	al_use_shader(data->shader);
 	al_set_shader_int("scaleFactor", 1);
 
-	al_draw_scaled_rotated_bitmap(data->pixelator, 320/2, 180*(3/4), 320/2, 180/2 - 110, 1.1*scale, 1.1*scale, rot, 0);
+	al_draw_scaled_rotated_bitmap(data->pixelator, 320/2, 180*(3/4), 320/2, 180/2 - 120 + yoffset, 1.1*scale, 1.1*scale, rot, 0);
 
 	al_use_shader(NULL);
 
@@ -555,6 +559,16 @@ void Gamestate_ProcessEvent(struct Game *game, struct GamestateResources* data, 
 		data->score1 = 0;
 		data->score2 = 0;
 	}
+	if ((ev->type==ALLEGRO_EVENT_KEY_DOWN) && (ev->keyboard.keycode == ALLEGRO_KEY_M)) {
+		if (data->yoffset == 0) {
+			LoadLevel(game, data, "levels/border.lvl");
+			data->yoffset = 10;
+		} else {
+			LoadLevel(game, data, "levels/multi.lvl");
+			data->yoffset = 0;
+		}
+
+	}
 
 
 	if (ev->type == ALLEGRO_EVENT_AUDIO_RECORDER_FRAGMENT) {
@@ -645,6 +659,8 @@ void Gamestate_Start(struct Game *game, struct GamestateResources* data) {
 	data->shakin_dudi = 0;
 	data->score1 = 0;
 	data->score2 = 0;
+
+	data->yoffset = 0;
 }
 
 void Gamestate_Stop(struct Game *game, struct GamestateResources* data) {
