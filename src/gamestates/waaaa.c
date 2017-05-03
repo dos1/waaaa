@@ -49,6 +49,8 @@ struct GamestateResources {
 		ALLEGRO_AUDIO_STREAM *audio;
 		ALLEGRO_AUDIO_RECORDER *recorder;
 		ALLEGRO_MIXER *mixer;
+		ALLEGRO_BITMAP *crt;
+		ALLEGRO_BITMAP *screen;
 		float bars[BARS_NUM];
 		float fft[SAMPLE_RATE / 2 + 1];
 		float ringbuffer[SAMPLE_RATE];
@@ -326,7 +328,7 @@ void Gamestate_Logic(struct Game *game, struct GamestateResources* data) {
 	}
 	data->blink_counter++;
 	if (data->blink_counter >= 60) {
-					data->blink_counter = 0;
+		      data->blink_counter = 0;
 	}
 }
 
@@ -366,24 +368,28 @@ void Gamestate_Draw(struct Game *game, struct GamestateResources* data) {
 	// Called as soon as possible, but no sooner than next Gamestate_Logic call.
 	// Draw everything to the screen here.
 
-	al_clear_to_color(al_map_rgb(0,0,0));
-
-	al_set_target_bitmap(data->pixelator);
-
 	al_clear_to_color(al_color_hsv(fabs(sin(data->rotation/360.0)) * 360, 0.75, 0.5 + sin(data->rotation/20.0)/20.0));
-	al_draw_filled_rectangle(0, 180-data->screamtime, 320, 180, al_map_rgb(255,255,255)); // scream bar
-	al_draw_filled_rectangle(0, 0, 320, 180, al_map_rgba(data->screamtime, data->screamtime, data->screamtime, data->screamtime));
+	ALLEGRO_TRANSFORM trans;
+	al_identity_transform(&trans);
+	int clipX, clipY, clipWidth, clipHeight;
+	al_get_clipping_rectangle(&clipX, &clipY, &clipWidth, &clipHeight);
+	al_use_transform(&trans);
 
-	al_set_target_backbuffer(game->display);
-	al_use_shader(data->shader);
-	al_set_shader_int("scaleFactor", 2);
-	al_draw_bitmap(data->pixelator, 0, 0, 0);
-	al_use_shader(NULL);
+	al_hold_bitmap_drawing(true);
+	for (int i=0; i<al_get_display_width(game->display); i+=al_get_bitmap_width(data->crt)) {
+		for (int j=0; j<al_get_display_height(game->display); j+=al_get_bitmap_height(data->crt)) {
+			al_draw_bitmap(data->crt, i, j, 0);
+		}
+	}
+	al_hold_bitmap_drawing(false);
+
+	al_use_transform(&game->projection);
 
 	al_set_target_bitmap(data->pixelator);
 	al_clear_to_color(al_map_rgba(0,0,0,0));
 
 	// LEVEL DRAWING
+	al_hold_bitmap_drawing(true);
 	for (int x=0; x<80; x++) {
 		for (int y=0; y<45; y++) {
 			if (data->level[x][y]=='O') {
@@ -414,6 +420,7 @@ void Gamestate_Draw(struct Game *game, struct GamestateResources* data) {
 			break;
 		}
 	}
+	al_hold_bitmap_drawing(false);
 
 	/*
 	// WAVEFORM DRAWING
@@ -442,7 +449,7 @@ void Gamestate_Draw(struct Game *game, struct GamestateResources* data) {
 	}
 	if (data->demo_mode) {
 		if (data->blink_counter < 50) {
-			al_draw_text(data->font, al_map_rgb(255,255,255), 320/2, 126, ALLEGRO_ALIGN_CENTER, "GRAB A MICROPHONE AND PLAY!");
+			al_draw_text(data->font, al_map_rgb(255,255,255), 320/2, 126, ALLEGRO_ALIGN_CENTER, "ZŁAP ZA MIKROFON I GRAJ!");
 		}
 	}
 //	}
@@ -465,6 +472,7 @@ void Gamestate_Draw(struct Game *game, struct GamestateResources* data) {
 	al_set_target_bitmap(data->background);
 	al_clear_to_color(al_map_rgba(0,0,0,0));
 
+	al_hold_bitmap_drawing(true);
 	al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2, 180/2 - 40, 1.1*4*scale, 1.1*4*scale, rot, 0);
 	al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 + 2, 180/2 - 40, 1.1*4*scale, 1.1*4*scale, rot, 0);
 	al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 - 2, 180/2 - 40, 1.1*4*scale, 1.1*4*scale, rot, 0);
@@ -480,21 +488,43 @@ void Gamestate_Draw(struct Game *game, struct GamestateResources* data) {
 	al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 - 2, 180/2 - 120 + yoffset, 1.1*4*scale, 1.1*4*scale, rot, 0);
 	al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 - 2, 180/2 - 120 + yoffset - 3, 1.1*4*scale, 1.1*4*scale, rot, 0);
 	al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320/4/2, (180/4)*(3/4), 320/2 + 2, 180/2 - 120 + yoffset - 3, 1.1*4*scale, 1.1*4*scale, rot, 0);
+	al_hold_bitmap_drawing(false);
 
 	al_set_target_backbuffer(game->display);
 	al_draw_bitmap(data->background, 0, 0, 0);
 
 	float offset = data->distortion / 2.0 * (rand() / (float)RAND_MAX);
 
+	al_hold_bitmap_drawing(true);
 	al_draw_tinted_scaled_rotated_bitmap(data->pixelator, al_map_rgba(0,192,192, 192), 320/2, 180*(3/4), 320/2 - 2*offset, 180/2 - 120 + yoffset, 1.1*scale, 1.1*scale, rot, 0);
 	al_draw_tinted_scaled_rotated_bitmap(data->pixelator, al_map_rgba(192,0,0, 192), 320/2, 180*(3/4), 320/2 + 2*offset, 180/2 - 120 + yoffset, 1.1*scale, 1.1*scale, rot, 0);
+	al_hold_bitmap_drawing(false);
 
-	al_use_shader(data->shader);
-	al_set_shader_int("scaleFactor", 1);
+	al_set_target_bitmap(data->screen);
+	al_clear_to_color(al_map_rgba(0,0,0,0));
+//	al_use_shader(data->shader);
+//	al_set_shader_int("scaleFactor", 1);
 
-	al_draw_scaled_rotated_bitmap(data->pixelator, 320/2, 180*(3/4), 320/2, 180/2 - 120 + yoffset, 1.1*scale, 1.1*scale, rot, 0);
+	al_hold_bitmap_drawing(true);
+	for (int i=0; i<al_get_display_width(game->display); i+=al_get_bitmap_width(data->crt)) {
+		for (int j=0; j<al_get_display_height(game->display); j+=al_get_bitmap_height(data->crt)) {
+			//al_draw_scaled_bitmap(data->crt, 0, 0, 500, 500, i, j, 1000, 1000, 0);
+			al_draw_bitmap(data->crt, i, j, 0);
+		}
+	}
+	al_hold_bitmap_drawing(false);
 
-	al_use_shader(NULL);
+	al_set_blender(ALLEGRO_SRC_MINUS_DEST, ALLEGRO_ONE, ALLEGRO_ALPHA);
+	al_draw_scaled_bitmap(data->pixelator, 0, 0, 320, 180, 0, 0, al_get_bitmap_width(data->screen),al_get_bitmap_height(data->screen), 0);
+	al_set_blender(ALLEGRO_ADD, ALLEGRO_ONE, ALLEGRO_INVERSE_ALPHA);
+
+	//	al_use_shader(NULL);
+
+	al_set_target_backbuffer(game->display);
+	//al_clear_to_color(al_map_rgb(0,255,0));
+//al_draw_bitmap(data->screen, 0, 0,0);
+	//al_draw_scaled_bitmap(data->screen, 0 ,0, al_get_bitmap_width(data->screen), al_get_bitmap_height(data->screen), 0, 0, 320, 180, 0);
+	al_draw_scaled_rotated_bitmap(data->screen, al_get_bitmap_width(data->screen)/2, al_get_bitmap_height(data->screen)*(3/4), 320/2, 180/2 - 120 + yoffset, 320/(float)al_get_bitmap_width(data->screen) * 1.1*scale, 180/(float)al_get_bitmap_height(data->screen) * 1.1*scale, rot, 0);
 
 }
 
@@ -663,6 +693,22 @@ void* Gamestate_Load(struct Game *game, void (*progress)(struct Game*)) {
 	al_attach_sample_instance_to_mixer(data->point, game->audio.fx);
 	al_set_sample_instance_playmode(data->point, ALLEGRO_PLAYMODE_ONCE);
 
+	data->screen = al_create_bitmap(al_get_display_width(game->display), al_get_display_height(game->display));
+
+	data->crt = al_create_bitmap(500, 500);
+	ALLEGRO_BITMAP *crt = al_load_bitmap(GetDataFilePath(game, "crt.png"));
+	al_set_target_bitmap(data->crt);
+	al_clear_to_color(al_map_rgba(0,0,0,0));
+	al_hold_bitmap_drawing(true);
+	for (int i=0; i<al_get_display_width(game->display); i+=al_get_bitmap_width(crt)) {
+		for (int j=0; j<al_get_display_height(game->display); j+=al_get_bitmap_height(crt)) {
+			al_draw_bitmap(crt, i, j, 0);
+		}
+	}
+	al_hold_bitmap_drawing(false);
+	al_destroy_bitmap(crt);
+
+
 	data->shader = al_create_shader(ALLEGRO_SHADER_GLSL);
 	PrintConsole(game, "VERTEX: %d", al_attach_shader_source_file(data->shader, ALLEGRO_VERTEX_SHADER, GetDataFilePath(game, "vertex.glsl")));
 	PrintConsole(game, "%s", al_get_shader_log(data->shader));
@@ -682,6 +728,8 @@ void Gamestate_Unload(struct Game *game, struct GamestateResources* data) {
 	al_destroy_audio_stream(data->audio);
 	al_destroy_mixer(data->mixer);
 	al_destroy_audio_recorder(data->recorder);
+	al_destroy_bitmap(data->crt);
+	al_destroy_bitmap(data->screen);
 	free(data);
 }
 
