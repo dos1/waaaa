@@ -82,6 +82,8 @@ struct GamestateResources {
 
 		bool demo_mode;
 		int blink_counter;
+
+		bool use_shaders;
 };
 
 int Gamestate_ProgressCount = 1; // number of loading steps as reported by Gamestate_Load
@@ -312,7 +314,7 @@ void Gamestate_Logic(struct Game *game, struct GamestateResources* data) {
 	if (data->max_max <= MAX_MAX_LIMIT + 0.001) {
 		if (!data->demo_mode) {
 			// start demo mode
-			PrintConsole(game, "starting` demo");
+			PrintConsole(game, "starting demo");
 			data->demo_mode = true;
 			LoadLevel(game, data, "levels/menu.lvl");
 		}
@@ -368,22 +370,37 @@ void Gamestate_Draw(struct Game *game, struct GamestateResources* data) {
 	// Called as soon as possible, but no sooner than next Gamestate_Logic call.
 	// Draw everything to the screen here.
 
-	al_clear_to_color(al_color_hsv(fabs(sin(data->rotation/360.0)) * 360, 0.75, 0.5 + sin(data->rotation/20.0)/20.0));
-	ALLEGRO_TRANSFORM trans;
-	al_identity_transform(&trans);
-	int clipX, clipY, clipWidth, clipHeight;
-	al_get_clipping_rectangle(&clipX, &clipY, &clipWidth, &clipHeight);
-	al_use_transform(&trans);
+	if (data->use_shaders) {
 
-	al_hold_bitmap_drawing(true);
-	for (int i=0; i<al_get_display_width(game->display); i+=al_get_bitmap_width(data->crt)) {
-		for (int j=0; j<al_get_display_height(game->display); j+=al_get_bitmap_height(data->crt)) {
-			al_draw_bitmap(data->crt, i, j, 0);
+		al_set_target_bitmap(data->pixelator);
+		al_clear_to_color(al_color_hsv(fabs(sin(data->rotation/360.0)) * 360, 0.75, 0.5 + sin(data->rotation/20.0)/20.0));
+
+		al_set_target_backbuffer(game->display);
+		al_use_shader(data->shader);
+		al_set_shader_int("scaleFactor", 2);
+
+		al_draw_bitmap(data->pixelator, 0, 0, 0);
+
+		al_use_shader(NULL);
+	} else {
+
+		al_clear_to_color(al_color_hsv(fabs(sin(data->rotation/360.0)) * 360, 0.75, 0.5 + sin(data->rotation/20.0)/20.0));
+		ALLEGRO_TRANSFORM trans;
+		al_identity_transform(&trans);
+		int clipX, clipY, clipWidth, clipHeight;
+		al_get_clipping_rectangle(&clipX, &clipY, &clipWidth, &clipHeight);
+		al_use_transform(&trans);
+
+		al_hold_bitmap_drawing(true);
+		for (int i=0; i<al_get_display_width(game->display); i+=al_get_bitmap_width(data->crt)) {
+			for (int j=0; j<al_get_display_height(game->display); j+=al_get_bitmap_height(data->crt)) {
+				al_draw_bitmap(data->crt, i, j, 0);
+			}
 		}
-	}
-	al_hold_bitmap_drawing(false);
+		al_hold_bitmap_drawing(false);
 
-	al_use_transform(&game->projection);
+		al_use_transform(&game->projection);
+	}
 
 	al_set_target_bitmap(data->pixelator);
 	al_clear_to_color(al_map_rgba(0,0,0,0));
@@ -392,17 +409,21 @@ void Gamestate_Draw(struct Game *game, struct GamestateResources* data) {
 	al_hold_bitmap_drawing(true);
 	for (int x=0; x<80; x++) {
 		for (int y=0; y<45; y++) {
+			int color = 32;
+			if (!data->use_shaders) color = 50;
+			int color2 = 64;
+			if (!data->use_shaders) color2 = 95;
 			if (data->level[x][y]=='O') {
 				al_draw_filled_rectangle(x*4, y*4, x*4+4, y*4+4, al_map_rgb(255,255,255));
 			}
 			if (data->level[x][y]=='X') {
-				al_draw_filled_rectangle(x*4, y*4, x*4+4, y*4+4, al_map_rgba(0,0,32,32));
+				al_draw_filled_rectangle(x*4, y*4, x*4+4, y*4+4, al_map_rgba(0,0,color,color));
 			}
 			if (data->level[x][y]=='Y') {
-				al_draw_filled_rectangle(x*4, y*4, x*4+4, y*4+4, al_map_rgba(32,0,0,32));
+				al_draw_filled_rectangle(x*4, y*4, x*4+4, y*4+4, al_map_rgba(color,0,0,color));
 			}
 			if (data->level[x][y]=='a') {
-				al_draw_filled_rectangle(x*4, y*4, x*4+4, y*4+4, al_map_rgba(64,64,64,64));
+				al_draw_filled_rectangle(x*4, y*4, x*4+4, y*4+4, al_map_rgba(color2,color2,color2,color2));
 			}
 		}
 	}
@@ -500,32 +521,40 @@ void Gamestate_Draw(struct Game *game, struct GamestateResources* data) {
 	al_draw_tinted_scaled_rotated_bitmap(data->pixelator, al_map_rgba(192,0,0, 192), 320/2, 180*(3/4), 320/2 + 2*offset, 180/2 - 120 + yoffset, 1.1*scale, 1.1*scale, rot, 0);
 	al_hold_bitmap_drawing(false);
 
-	al_set_target_bitmap(data->screen);
-	al_clear_to_color(al_map_rgba(0,0,0,0));
-//	al_use_shader(data->shader);
-//	al_set_shader_int("scaleFactor", 1);
 
-	al_hold_bitmap_drawing(true);
-	for (int i=0; i<al_get_display_width(game->display); i+=al_get_bitmap_width(data->crt)) {
-		for (int j=0; j<al_get_display_height(game->display); j+=al_get_bitmap_height(data->crt)) {
-			//al_draw_scaled_bitmap(data->crt, 0, 0, 500, 500, i, j, 1000, 1000, 0);
-			al_draw_bitmap(data->crt, i, j, 0);
+	if (data->use_shaders) {
+		al_use_shader(data->shader);
+		al_set_shader_int("scaleFactor", 1);
+		al_draw_scaled_rotated_bitmap(data->pixelator, 320/2, 180*(3/4), 320/2, 180/2 - 120, 1.1*scale, 1.1*scale, rot, 0);
+		al_use_shader(NULL);
+	} else {
+
+		al_set_target_bitmap(data->screen);
+		al_clear_to_color(al_map_rgba(0,0,0,0));
+
+		al_draw_scaled_bitmap(data->pixelator, 0, 0, 320, 180, 0, 0, al_get_bitmap_width(data->screen),al_get_bitmap_height(data->screen), 0);
+		al_hold_bitmap_drawing(true);
+		for (int i=0; i<al_get_display_width(game->display); i+=al_get_bitmap_width(data->crt)*2) {
+			for (int j=0; j<al_get_display_height(game->display); j+=al_get_bitmap_height(data->crt)) {
+				al_draw_scaled_bitmap(data->crt, 0, 0, 500, 500, i, j, 1000, 500, 0);
+				//al_draw_bitmap(data->crt, i, j, 0);
+			}
 		}
+		al_hold_bitmap_drawing(false);
+
+		al_set_blender(ALLEGRO_ADD, ALLEGRO_ZERO, ALLEGRO_ALPHA); // now as a mask
+		al_draw_scaled_bitmap(data->pixelator, 0, 0, 320, 180, 0, 0, al_get_bitmap_width(data->screen),al_get_bitmap_height(data->screen), 0);
+
+		al_set_blender(ALLEGRO_ADD, ALLEGRO_ONE, ALLEGRO_INVERSE_ALPHA);
+
+		//	al_use_shader(NULL);
+
+		al_set_target_backbuffer(game->display);
+		//al_clear_to_color(al_map_rgb(0,255,0));
+	//al_draw_bitmap(data->screen, 0, 0,0);
+		//al_draw_scaled_bitmap(data->screen, 0 ,0, al_get_bitmap_width(data->screen), al_get_bitmap_height(data->screen), 0, 0, 320, 180, 0);
+		al_draw_scaled_rotated_bitmap(data->screen, al_get_bitmap_width(data->screen)/2, al_get_bitmap_height(data->screen)*(3/4), 320/2, 180/2 - 120 + yoffset, 320/(float)al_get_bitmap_width(data->screen) * 1.1*scale, 180/(float)al_get_bitmap_height(data->screen) * 1.1*scale, rot, 0);
 	}
-	al_hold_bitmap_drawing(false);
-
-	al_set_blender(ALLEGRO_SRC_MINUS_DEST, ALLEGRO_ONE, ALLEGRO_ALPHA);
-	al_draw_scaled_bitmap(data->pixelator, 0, 0, 320, 180, 0, 0, al_get_bitmap_width(data->screen),al_get_bitmap_height(data->screen), 0);
-	al_set_blender(ALLEGRO_ADD, ALLEGRO_ONE, ALLEGRO_INVERSE_ALPHA);
-
-	//	al_use_shader(NULL);
-
-	al_set_target_backbuffer(game->display);
-	//al_clear_to_color(al_map_rgb(0,255,0));
-//al_draw_bitmap(data->screen, 0, 0,0);
-	//al_draw_scaled_bitmap(data->screen, 0 ,0, al_get_bitmap_width(data->screen), al_get_bitmap_height(data->screen), 0, 0, 320, 180, 0);
-	al_draw_scaled_rotated_bitmap(data->screen, al_get_bitmap_width(data->screen)/2, al_get_bitmap_height(data->screen)*(3/4), 320/2, 180/2 - 120 + yoffset, 320/(float)al_get_bitmap_width(data->screen) * 1.1*scale, 180/(float)al_get_bitmap_height(data->screen) * 1.1*scale, rot, 0);
-
 }
 
 void MixerPostprocess(void *buffer, unsigned int samples, void* userdata) {
@@ -641,7 +670,10 @@ void Gamestate_ProcessEvent(struct Game *game, struct GamestateResources* data, 
 		}
 
 	}
-
+	if ((ev->type==ALLEGRO_EVENT_KEY_DOWN) && (ev->keyboard.keycode == ALLEGRO_KEY_S)) {
+		data->use_shaders = !data->use_shaders;
+		PrintConsole(game, "use_shaders: %d", data->use_shaders);
+	}
 
 	if (ev->type == ALLEGRO_EVENT_AUDIO_RECORDER_FRAGMENT) {
 		ALLEGRO_AUDIO_RECORDER_EVENT *re = al_get_audio_recorder_event(ev);
@@ -693,6 +725,8 @@ void* Gamestate_Load(struct Game *game, void (*progress)(struct Game*)) {
 	al_attach_sample_instance_to_mixer(data->point, game->audio.fx);
 	al_set_sample_instance_playmode(data->point, ALLEGRO_PLAYMODE_ONCE);
 
+	int flags = al_get_new_bitmap_flags();
+	al_set_new_bitmap_flags(flags | ALLEGRO_MAG_LINEAR | ALLEGRO_MIN_LINEAR);
 	data->screen = al_create_bitmap(al_get_display_width(game->display), al_get_display_height(game->display));
 
 	data->crt = al_create_bitmap(500, 500);
@@ -708,6 +742,7 @@ void* Gamestate_Load(struct Game *game, void (*progress)(struct Game*)) {
 	al_hold_bitmap_drawing(false);
 	al_destroy_bitmap(crt);
 
+	al_set_new_bitmap_flags(flags);
 
 	data->shader = al_create_shader(ALLEGRO_SHADER_GLSL);
 	PrintConsole(game, "VERTEX: %d", al_attach_shader_source_file(data->shader, ALLEGRO_VERTEX_SHADER, GetDataFilePath(game, "vertex.glsl")));
@@ -736,6 +771,7 @@ void Gamestate_Unload(struct Game *game, struct GamestateResources* data) {
 void Gamestate_Start(struct Game *game, struct GamestateResources* data) {
 	// Called when this gamestate gets control. Good place for initializing state,
 	// playing music etc.
+	data->use_shaders = false;
 	data->ringpos = 0;
 	data->max_max = MAX_MAX_LIMIT;
 	data->demo_mode = true;
