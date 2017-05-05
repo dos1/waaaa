@@ -51,6 +51,7 @@ struct GamestateResources {
 		ALLEGRO_MIXER *mixer;
 		ALLEGRO_BITMAP *crt;
 		ALLEGRO_BITMAP *screen;
+		ALLEGRO_BITMAP *stage;
 		float bars[BARS_NUM];
 		float fft[SAMPLE_RATE / 2 + 1];
 		float ringbuffer[SAMPLE_RATE];
@@ -84,6 +85,7 @@ struct GamestateResources {
 		int blink_counter;
 
 		bool use_shaders;
+		char* current_level;
 };
 
 int Gamestate_ProgressCount = 1; // number of loading steps as reported by Gamestate_Load
@@ -357,13 +359,41 @@ void LoadLevel(struct Game *game, struct GamestateResources *data, char* name) {
 		}
 	}
 
-	data->x = 320/2;
+/*	data->x = 320/2;
 	data->y = 120;
 	data->vx = 0;
-	data->vy = 0;
+	data->vy = 0;*/
 
 	al_fclose(file);
 
+	data->current_level = name;
+
+	// drawing
+	al_set_target_bitmap(data->stage);
+	al_clear_to_color(al_map_rgba(0,0,0,0));
+	al_hold_bitmap_drawing(true);
+	for (int x=0; x<80; x++) {
+		for (int y=0; y<45; y++) {
+			int color = 32;
+			if (!data->use_shaders) color = 50;
+			int color2 = 64;
+			if (!data->use_shaders) color2 = 95;
+			if (data->level[x][y]=='O') {
+				al_draw_filled_rectangle(x*4, y*4, x*4+4, y*4+4, al_map_rgb(255,255,255));
+			}
+			if (data->level[x][y]=='X') {
+				al_draw_filled_rectangle(x*4, y*4, x*4+4, y*4+4, al_map_rgba(0,0,color,color));
+			}
+			if (data->level[x][y]=='Y') {
+				al_draw_filled_rectangle(x*4, y*4, x*4+4, y*4+4, al_map_rgba(color,0,0,color));
+			}
+			if (data->level[x][y]=='a') {
+				al_draw_filled_rectangle(x*4, y*4, x*4+4, y*4+4, al_map_rgba(color2,color2,color2,color2));
+			}
+		}
+	}
+	al_hold_bitmap_drawing(false);
+	al_set_target_backbuffer(game->display);
 }
 
 void Gamestate_Draw(struct Game *game, struct GamestateResources* data) {
@@ -406,29 +436,10 @@ void Gamestate_Draw(struct Game *game, struct GamestateResources* data) {
 	al_clear_to_color(al_map_rgba(0,0,0,0));
 
 	// LEVEL DRAWING
-	al_hold_bitmap_drawing(true);
-	for (int x=0; x<80; x++) {
-		for (int y=0; y<45; y++) {
-			int color = 32;
-			if (!data->use_shaders) color = 50;
-			int color2 = 64;
-			if (!data->use_shaders) color2 = 95;
-			if (data->level[x][y]=='O') {
-				al_draw_filled_rectangle(x*4, y*4, x*4+4, y*4+4, al_map_rgb(255,255,255));
-			}
-			if (data->level[x][y]=='X') {
-				al_draw_filled_rectangle(x*4, y*4, x*4+4, y*4+4, al_map_rgba(0,0,color,color));
-			}
-			if (data->level[x][y]=='Y') {
-				al_draw_filled_rectangle(x*4, y*4, x*4+4, y*4+4, al_map_rgba(color,0,0,color));
-			}
-			if (data->level[x][y]=='a') {
-				al_draw_filled_rectangle(x*4, y*4, x*4+4, y*4+4, al_map_rgba(color2,color2,color2,color2));
-			}
-		}
-	}
+	al_draw_bitmap(data->stage, 0, 0, 0);
 
 	// BAR DRAWING
+	al_hold_bitmap_drawing(true);
 	int width = 320/BARS_NUM;
 	if (width==0) {
 		width = 1;
@@ -673,6 +684,7 @@ void Gamestate_ProcessEvent(struct Game *game, struct GamestateResources* data, 
 	if ((ev->type==ALLEGRO_EVENT_KEY_DOWN) && (ev->keyboard.keycode == ALLEGRO_KEY_S)) {
 		data->use_shaders = !data->use_shaders;
 		PrintConsole(game, "use_shaders: %d", data->use_shaders);
+		LoadLevel(game, data, data->current_level);
 	}
 
 	if (ev->type == ALLEGRO_EVENT_AUDIO_RECORDER_FRAGMENT) {
@@ -716,6 +728,7 @@ void* Gamestate_Load(struct Game *game, void (*progress)(struct Game*)) {
 	}
 
 	data->pixelator = al_create_bitmap(320, 180);
+	data->stage = al_create_bitmap(320, 180);
 	data->background = al_create_bitmap(320, 180);
 	data->blurer = al_create_bitmap(320/4, 180/4);
 
@@ -765,6 +778,7 @@ void Gamestate_Unload(struct Game *game, struct GamestateResources* data) {
 	al_destroy_audio_recorder(data->recorder);
 	al_destroy_bitmap(data->crt);
 	al_destroy_bitmap(data->screen);
+	al_destroy_bitmap(data->stage);
 	free(data);
 }
 
@@ -777,6 +791,10 @@ void Gamestate_Start(struct Game *game, struct GamestateResources* data) {
 	data->demo_mode = true;
 	al_start_audio_recorder(data->recorder);
 	LoadLevel(game, data, "levels/menu.lvl");
+	data->x = 320/2;
+	data->y = 120;
+	data->vx = 0;
+	data->vy = 0;
 
 	data->distortion = 0;
 	data->rotation = 0;
