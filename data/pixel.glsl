@@ -1,8 +1,8 @@
-/*
 #ifdef GL_ES
 precision mediump float;
 #endif
-uniform sampler2D al_tex;
+
+/*uniform sampler2D al_tex;
 uniform bool al_use_tex;
 varying vec4 varying_color;
 varying vec2 varying_texcoord;

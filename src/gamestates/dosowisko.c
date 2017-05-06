@@ -179,9 +179,9 @@ void Gamestate_ProcessEvent(struct Game *game, struct GamestateResources* data, 
 void* Gamestate_Load(struct Game *game, void (*progress)(struct Game*)) {
 	struct GamestateResources *data = malloc(sizeof(struct GamestateResources));
 	data->timeline = TM_Init(game, "main");
-	data->bitmap = al_create_bitmap(game->viewport.width, game->viewport.height);
+	data->bitmap = CreateNotPreservedBitmap(game->viewport.width, game->viewport.height);
 	data->checkerboard = al_create_bitmap(game->viewport.width, game->viewport.height);
-	data->pixelator = al_create_bitmap(game->viewport.width, game->viewport.height);
+	data->pixelator = CreateNotPreservedBitmap(game->viewport.width, game->viewport.height);
 
 	al_set_target_bitmap(data->checkerboard);
 	al_lock_bitmap(data->checkerboard, ALLEGRO_PIXEL_FORMAT_ANY, ALLEGRO_LOCK_WRITEONLY);
@@ -243,7 +243,10 @@ void Gamestate_Unload(struct Game *game, struct GamestateResources* data) {
 	free(data);
 }
 
-void Gamestate_Reload(struct Game *game, struct GamestateResources* data) {}
+void Gamestate_Reload(struct Game *game, struct GamestateResources* data) {
+	data->bitmap = CreateNotPreservedBitmap(game->viewport.width, game->viewport.height);
+	data->pixelator = CreateNotPreservedBitmap(game->viewport.width, game->viewport.height);
+}
 
 void Gamestate_Pause(struct Game *game, struct GamestateResources* data) {
 	TM_Pause(data->timeline);
