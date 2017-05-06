@@ -49,7 +49,7 @@ struct GamestateResources {
 		ALLEGRO_AUDIO_STREAM *audio;
 		ALLEGRO_AUDIO_RECORDER *recorder;
 		ALLEGRO_MIXER *mixer;
-		ALLEGRO_BITMAP *crt;
+		ALLEGRO_BITMAP *crt, *crtbg;
 		ALLEGRO_BITMAP *screen;
 		ALLEGRO_BITMAP *stage;
 		float bars[BARS_NUM];
@@ -64,6 +64,8 @@ struct GamestateResources {
 
 		ALLEGRO_SAMPLE_INSTANCE *point;
 		ALLEGRO_SAMPLE *point_sample;
+
+		ALLEGRO_MUTEX *mutex;
 
 		int distortion;
 		float rotation;
@@ -95,6 +97,8 @@ void LoadLevel(struct Game *game, struct GamestateResources *data, char* name);
 
 void Gamestate_Logic(struct Game *game, struct GamestateResources* data) {
 	// Called 60 times per second. Here you should do all your game logic.
+
+	al_lock_mutex(data->mutex); // we don't want to get the ringbuffer rewritten as we access it
 	int end = data->ringpos - FFT_SAMPLES;
 	if (end < 0) {
 		end += SAMPLE_RATE;
@@ -112,6 +116,7 @@ void Gamestate_Logic(struct Game *game, struct GamestateResources* data) {
 	}
 
 	FFT(data->fftbuffer, FFT_SAMPLES, data);
+	al_unlock_mutex(data->mutex);
 
 	float gain = 0;
 	for (int i=0; i<BARS_NUM; i++) {
@@ -421,13 +426,15 @@ void Gamestate_Draw(struct Game *game, struct GamestateResources* data) {
 		al_get_clipping_rectangle(&clipX, &clipY, &clipWidth, &clipHeight);
 		al_use_transform(&trans);
 
+		al_set_separate_blender(ALLEGRO_DEST_MINUS_SRC, ALLEGRO_ONE, ALLEGRO_INVERSE_ALPHA, ALLEGRO_ADD, ALLEGRO_ONE, ALLEGRO_INVERSE_ALPHA);
 		al_hold_bitmap_drawing(true);
-		for (int i=0; i<al_get_display_width(game->display); i+=al_get_bitmap_width(data->crt)) {
-			for (int j=0; j<al_get_display_height(game->display); j+=al_get_bitmap_height(data->crt)) {
-				al_draw_bitmap(data->crt, i, j, 0);
+		for (int i=0; i<al_get_display_width(game->display); i+=al_get_bitmap_width(data->crtbg)) {
+			for (int j=0; j<al_get_display_height(game->display); j+=al_get_bitmap_height(data->crtbg)) {
+				al_draw_bitmap(data->crtbg, i, j, 0);
 			}
 		}
 		al_hold_bitmap_drawing(false);
+		al_set_blender(ALLEGRO_ADD, ALLEGRO_ONE, ALLEGRO_INVERSE_ALPHA);
 
 		al_use_transform(&game->projection);
 	}
@@ -574,6 +581,9 @@ void MixerPostprocess(void *buffer, unsigned int samples, void* userdata) {
 	float *buf = buffer;
 	struct GamestateResources *data = userdata;
 
+	// critical section: don't use ringbuffer behind our back, as it's getting rewritten
+	al_lock_mutex(data->mutex);
+
 	int end = data->ringpos + samples;
 	if (end >= SAMPLE_RATE) {
 		end -= SAMPLE_RATE;
@@ -590,6 +600,8 @@ void MixerPostprocess(void *buffer, unsigned int samples, void* userdata) {
 		}
 	}
 	data->ringpos = end;
+
+	al_unlock_mutex(data->mutex);
 }
 
 void FFT(void *buffer, unsigned int samples, void* userdata) {
@@ -705,6 +717,7 @@ void* Gamestate_Load(struct Game *game, void (*progress)(struct Game*)) {
 	}
 
 	data->music_mode = false;
+	data->mutex = al_create_mutex();
 
 	data->mixer = al_create_mixer(SAMPLE_RATE, ALLEGRO_AUDIO_DEPTH_FLOAT32, ALLEGRO_CHANNEL_CONF_2);
 	al_attach_mixer_to_mixer(data->mixer, game->audio.music);
@@ -716,14 +729,18 @@ void* Gamestate_Load(struct Game *game, void (*progress)(struct Game*)) {
 	al_attach_audio_stream_to_mixer(data->audio, data->mixer);
 	al_set_audio_stream_gain(data->audio, 1.188);
 
-	if (data->music_mode) {
-		al_set_mixer_postprocess_callback(data->mixer, *MixerPostprocess, data);
-	}
-
 	data->recorder = al_create_audio_recorder(128, 1024, SAMPLE_RATE,
 	                                   ALLEGRO_AUDIO_DEPTH_FLOAT32, ALLEGRO_CHANNEL_CONF_2);
 
-	if (!data->music_mode) {
+	if (!data->recorder) {
+		data->music_mode = true;
+		PrintConsole(game, "ERROR: audio recorder failed!");
+	}
+
+
+	if (data->music_mode) {
+		al_set_mixer_postprocess_callback(data->mixer, *MixerPostprocess, data);
+	} else {
 		al_register_event_source(game->_priv.event_queue, al_get_audio_recorder_event_source(data->recorder));
 	}
 
@@ -755,6 +772,19 @@ void* Gamestate_Load(struct Game *game, void (*progress)(struct Game*)) {
 	al_hold_bitmap_drawing(false);
 	al_destroy_bitmap(crt);
 
+	data->crtbg = al_create_bitmap(500, 500);
+	crt = al_load_bitmap(GetDataFilePath(game, "crtbg.png"));
+	al_set_target_bitmap(data->crtbg);
+	al_clear_to_color(al_map_rgba(0,0,0,0));
+	al_hold_bitmap_drawing(true);
+	for (int i=0; i<al_get_display_width(game->display); i+=al_get_bitmap_width(crt)) {
+		for (int j=0; j<al_get_display_height(game->display); j+=al_get_bitmap_height(crt)) {
+			al_draw_bitmap(crt, i, j, 0);
+		}
+	}
+	al_hold_bitmap_drawing(false);
+	al_destroy_bitmap(crt);
+
 	al_set_new_bitmap_flags(flags);
 
 	data->shader = al_create_shader(ALLEGRO_SHADER_GLSL);
@@ -775,10 +805,21 @@ void Gamestate_Unload(struct Game *game, struct GamestateResources* data) {
 	al_destroy_font(data->font);
 	al_destroy_audio_stream(data->audio);
 	al_destroy_mixer(data->mixer);
-	al_destroy_audio_recorder(data->recorder);
+	if (data->recorder) {
+		al_destroy_audio_recorder(data->recorder);
+	}
 	al_destroy_bitmap(data->crt);
 	al_destroy_bitmap(data->screen);
 	al_destroy_bitmap(data->stage);
+
+	al_destroy_bitmap(data->pixelator);
+	al_destroy_bitmap(data->blurer);
+	al_destroy_bitmap(data->background);
+	al_destroy_shader(data->shader);
+	al_destroy_sample_instance(data->point);
+	al_destroy_sample(data->point_sample);
+
+	al_destroy_mutex(data->mutex);
 	free(data);
 }
 
@@ -789,7 +830,9 @@ void Gamestate_Start(struct Game *game, struct GamestateResources* data) {
 	data->ringpos = 0;
 	data->max_max = MAX_MAX_LIMIT;
 	data->demo_mode = true;
-	al_start_audio_recorder(data->recorder);
+	if (data->recorder) {
+		al_start_audio_recorder(data->recorder);
+	}
 	LoadLevel(game, data, "levels/menu.lvl");
 	data->x = 320/2;
 	data->y = 120;
@@ -810,7 +853,9 @@ void Gamestate_Start(struct Game *game, struct GamestateResources* data) {
 
 void Gamestate_Stop(struct Game *game, struct GamestateResources* data) {
 	// Called when gamestate gets stopped. Stop timers, music etc. here.
-	al_stop_audio_recorder(data->recorder);
+	if (data->recorder) {
+		al_stop_audio_recorder(data->recorder);
+	}
 }
 
 void Gamestate_Pause(struct Game *game, struct GamestateResources* data) {
