@@ -32,10 +32,10 @@
 #define BARS_WIDTH 4
 #define BARS_OFFSET 8
 
-#define MAX_MAX_LIMIT 0.042
+#define MAX_MAX_LIMIT 0.3
 
-const int BALL_WIDTH = 3;
-const int BALL_HEIGHT = 3;
+const int BALL_WIDTH = 6;
+const int BALL_HEIGHT = 6;
 
 // TODO: play with moving window
 // TODO: mic volume / output fft normalization?
@@ -56,7 +56,10 @@ struct GamestateResources {
 		float ringbuffer[SAMPLE_RATE];
 		int ringpos;
 		float fftbuffer[FFT_SAMPLES];
-		float max_max;
+		float max_max, max, ballpos;
+
+		float rectwidth, rectpos, rectspeed;
+		bool recttop;
 
 		ALLEGRO_BITMAP *pixelator, *blurer, *background;
 		ALLEGRO_SHADER *shader;
@@ -134,182 +137,32 @@ void Gamestate_Logic(struct Game *game, struct GamestateResources* data) {
 
 	//PrintConsole(game, "gain %f", gain);
 
-	// COLLISION HANDLING (sucks)
 
-	int oldx = data->x;
-	int oldy = data->y;
+//	al_draw_filled_rectangle(data->rectpos, data->recttop ? 40 : 180-60, data->rectpos+data->rectwidth, data->recttop ? 100 : 180, al_map_rgb(255,255,255));
 
+	int rectx1 = data->rectpos, rectx2 = data->rectpos+data->rectwidth,
+	    recty1 =  data->recttop ? 40 : 180-60, recty2 = data->recttop ? 100 : 180;
 
-	data->x += data->vx;
-	data->y += data->vy;
-
-	if (data->vx > 0) {
-		data->vx -= 0.005;
-	} else if (data->vx < 0) {
-		data->vx += 0.005;
-	}
-	data->vy += 0.05;
-
-	if (data->y > 180-BALL_HEIGHT-5) {
-		data->vy = -data->vy / 3;
-		data->y = 178-5;
-	}
-
-	if (data->x < 0) {
-		data->vx = -data->vx;
-		data->x = 0;
-	}
-	if (data->x > 320) {
-		data->vx = -data->vx;
-		data->x = 320;
-	}
-	if (data->y == 180-BALL_HEIGHT-5) {
-		if (data->vx > 0) {
-			data->vx -= 0.01;
-		} else if (data->vx < 0) {
-			data->vx += 0.01;
-		}
-	}
+	//	data->x = 30;
+int ballpos = (1-data->ballpos) * 120 + 50;
+  //al_draw_filled_rectangle(data->x - BALL_WIDTH, data->y - BALL_HEIGHT, data->x + BALL_WIDTH, data->y + BALL_HEIGHT,
 
 
-	float x = 0; float width = BARS_WIDTH;
+  if ((rectx1 < 30 + BALL_WIDTH) && (rectx2 > 30)) {
+		if (((data->recttop) && (ballpos < recty2)) || ((!data->recttop) && (ballpos > recty1))) {
+			data->shakin_dudi=80;
 
-	for (int i = BARS_OFFSET; i <= 320/BARS_WIDTH + BARS_OFFSET; i++) {
-	//width -= 0.02;
-	if (data->bars[i] != data->bars[i]) { // NaN
-		break;
-	}
-	int pos = 176 - data->bars[i]*64;
-	int prev = 176 - data->bars[i-1]*64;
-	int next = 176 - data->bars[i+1]*64;
-	//PrintConsole(game, "data->y %f, pos %d", data->y, pos);
+			  data->score1=0;
+				data->rectwidth = 60;
 
-	if (data->y - BALL_HEIGHT >= pos) {
+				data->rectpos = 320;
+				data->rectspeed = 1;
 
-		//PrintConsole(game, "i %d pos data->y %f pos %d out[i][0] %f", i, data->y, pos, out[i][0]);
-
-		if (x-1 == data->x) {
-			// left
-			data->vy = (pos - data->y) / 15;
-			data->vx += -2;
-			PrintConsole(game, "left bump %d", pos);
-			data->y = pos;
-		}
-		else if (x + width == data->x) {
-			// right
-			data->vy = (pos - data->y) / 15;
-			data->vx += 2;
-			data->y = pos;
-			PrintConsole(game, "right bump %d", pos);
-		}
-		else if ((x <= data->x) && (x + width >= data->x)) {
-			data->vy = (pos - data->y) / 15 - data->vy * 0.5;
-			data->vx += ((rand() / (float)RAND_MAX) - 0.5) * 2;
-			data->y = pos;
-			//PrintConsole(game, "center bump %d", pos);
-
-			if ((prev < pos) && (next > pos)) {
-				data->vx += -2;
-			}
-			if ((prev > pos) && (next < pos)) {
-				data->vy += 2;
-			}
+			al_play_sample_instance(data->point);
 		}
 
 	}
 
-
-//	al_draw_filled_rectangle(x, 180 - data->out[i][0] * 10, x+width, 180, al_map_rgb(255,255,255));
-	  x+= width;
-	}
-
-
-	// collision with level
-
-	int oldsx = (int)(oldx / 4);
-	int oldsy = (int)(oldy / 4);
-
-	int sx = (int)(data->x /4);
-	int sy = (int)(data->y /4);
-
-	int tx = oldsx; int ty = oldsy;
-
-	int colx = sx; int coly = sy;
-
-	while ((tx != sx) && (ty != sy)) {
-		if (data->level[tx][ty] == '0') {
-			colx = tx;
-			coly = ty;
-			break;
-		}
-
-		if (tx != sx) { if (sx > tx) tx++; else tx--; }
-		if (ty != sy) { if (sy > ty) ty++; else ty--; }
-	}
-
-	if ((data->level[colx][coly] == 'X') || (data->level[colx][coly] == 'Y')) {
-		data->vx = 0;
-		data->vy = 0;
-		data->x = 320/2;
-		data->y = 120;
-
-		data->shakin_dudi=120;
-
-		if (data->level[colx][coly] == 'X') {
-			data->score1 ++;
-		} else {
-			data->score2 ++;
-		}
-
-		al_play_sample_instance(data->point);
-
-	}
-
-	if (data->level[colx][coly] == 'O') {
-		if (data->x != colx * 4) {
-			data->distortion=3;
-		}
-		if (data->y != coly * 4) {
-			data->distortion=3;
-		}
-		  data->x = oldsx * 4;
-			data->y = oldsy * 4;
-/*		if (data->vx > 0) {
-			data->x = -4;
-		} else {
-			data->x = +4;
-		}
-		if (data->vy > 0) {
-			data->y = -4;
-		} else {
-			data->y = +4;
-		}*/
-		PrintConsole(game, "collision %d %d", (int)(data->x / 4), (int)(data->y / 4));
-
-		data->vx = -data->vx * 0.5;
-		data->vy = -data->vy * 0.5;
-
-		if (fabs(data->vx) < 0.2) {
-			data->vx *= 10;
-		}
-		if (fabs(data->vy) < 0.2) {
-			data->vy *= 10;
-		}
-
-		if ((data->x == oldx) && (data->y == oldy)) {
-			// we're stuck! RANDOMMMMM and hope for the best
-			data->vx = ((rand() / (float)RAND_MAX) - 0.5) * 5;
-			data->vy = ((rand() / (float)RAND_MAX) - 0.5) * 5;
-		}
-	}
-
-	if (data->level[colx][coly] == '!') {
-		data->x = 320/2;
-		data->y = 120;
-	}
-
-
-	data->vx += sin(data->rotation / 20.0) / 75.0;
 
 	if (data->shakin_dudi) {
 		data->distortion = (rand() / (float)RAND_MAX) * 15;
@@ -323,16 +176,21 @@ void Gamestate_Logic(struct Game *game, struct GamestateResources* data) {
 				// start demo mode
 				PrintConsole(game, "starting demo");
 				data->demo_mode = true;
-				LoadLevel(game, data, "levels/menu.lvl");
+				LoadLevel(game, data, "levels/cinema.lvl");
 			}
 		} else {
 			if (data->demo_mode) {
 				// stop demo mode
 				PrintConsole(game, "out of demo at %f", data->max_max);
 				data->demo_mode = false;
-				LoadLevel(game, data, "levels/multi.lvl");
+				LoadLevel(game, data, "levels/blank.lvl");
 				data->score1 = 0;
 				data->score2 = 0;
+				data->rectwidth = 60;
+
+				data->rectpos = 320;
+				data->rectspeed = 1;
+
 			}
 		}
 	}
@@ -341,6 +199,31 @@ void Gamestate_Logic(struct Game *game, struct GamestateResources* data) {
 	if (data->blink_counter >= 60) {
 		      data->blink_counter = 0;
 	}
+	PrintConsole(game, "%f", data->max);
+
+	if (data->ballpos > data->max) {
+		data->ballpos-=0.0075;
+	} else {
+		data->ballpos+=0.0075;
+	}
+
+
+	if (!data->demo_mode) {
+
+		data->rectwidth -= 0.00001;
+		if (data->rectwidth < 5) {
+			data->rectwidth = 5;
+		}
+		data->rectpos -= data->rectspeed;
+		data->rectspeed += 0.0005;
+
+		if (data->rectpos < -data->rectwidth) {
+			data->rectpos = 320;
+			data->recttop = rand() % 2;
+			data->score1 ++;
+		}
+	}
+
 }
 
 void LoadLevel(struct Game *game, struct GamestateResources *data, char* name) {
@@ -401,6 +284,7 @@ void LoadLevel(struct Game *game, struct GamestateResources *data, char* name) {
 	}
 	al_hold_bitmap_drawing(false);
 	al_set_target_backbuffer(game->display);
+
 }
 
 void Gamestate_Draw(struct Game *game, struct GamestateResources* data) {
@@ -459,7 +343,13 @@ void Gamestate_Draw(struct Game *game, struct GamestateResources* data) {
 	width *= BARS_WIDTH;
 	for (int i=BARS_OFFSET; i<BARS_NUM; i++) {
 		int a = i-BARS_OFFSET;
-		al_draw_filled_rectangle(a*width, (int)(176 - data->bars[i]*64), a*width+width, 180, al_map_rgb(255,255,255));
+		al_draw_filled_rectangle(a*width, (int)(176 - data->bars[i]*64), a*width+width, 180, al_map_rgba(64, 64, 64, 64));
+
+		al_draw_filled_rectangle(a*width, 36, a*width+width,  180+36-(int)(176 - data->bars[i]*64), al_map_rgba(64, 64, 64, 64));
+
+		al_draw_filled_rectangle(a*width, 175, a*width+width, 180, al_map_rgb(255, 255, 255));
+		al_draw_filled_rectangle(a*width, 36, a*width+width, 41, al_map_rgb(255, 255, 255));
+
 		if (a*width > game->viewport.width) {
 			break;
 		}
@@ -477,26 +367,39 @@ void Gamestate_Draw(struct Game *game, struct GamestateResources* data) {
 
 	// BALL DRAWING
 //	if (!data->inmenu){
-	if (!data->demo_mode) {
+/*	if (!data->demo_mode) {
 		al_draw_textf(data->font, al_map_rgb(255,255,255), 320/2, 72, ALLEGRO_ALIGN_CENTER, data->shakin_dudi ? (((data->shakin_dudi / 10) % 2) ? "" : "SCORE!") : "WAAAA");
 	}
-
+*/
+	  if (!data->demo_mode) {
+	data->x = 30;
+	data->y = (1-data->ballpos) * 120 + 50;
 	al_draw_filled_rectangle(data->x - BALL_WIDTH, data->y - BALL_HEIGHT, data->x + BALL_WIDTH, data->y + BALL_HEIGHT,
 	                           //al_color_hsv(fabs(sin((data->rotation/360.0)+ALLEGRO_PI/4.0)) * 360, 1, 1));
 
 	                           al_map_rgb(255,255,0));
-//	}
+
+
+	  al_draw_filled_rectangle(data->rectpos, data->recttop ? 40 : 180-60, data->rectpos+data->rectwidth, data->recttop ? 100 : 180, al_map_rgb(255,255,255));
+
+		}
+
+		//	}
 	// UI DRAWING
 //	if (data->inmulti) {
 	if (!data->demo_mode) {
-		al_draw_textf(data->font, al_map_rgb(255,255,255), 320/2, 82, ALLEGRO_ALIGN_CENTER, "%d:%d", data->score1, data->score2);
+		al_draw_textf(data->font, al_map_rgb(255,255,255), 320/2, 104, ALLEGRO_ALIGN_CENTER, "%d", data->score1);
+
+	//	al_draw_textf(data->font, al_map_rgb(255,255,255), 320/2, 82, ALLEGRO_ALIGN_CENTER, "%d:%d", data->score1, data->score2);
 	}
 	if (data->demo_mode && !data->music_mode) {
 		if (data->blink_counter < 50) {
-			al_draw_text(data->font, al_map_rgb(255,255,255), 320/2, 126, ALLEGRO_ALIGN_CENTER, "GRAB A MICROPHONE AND PLAY!");
+			//al_draw_text(data->font, al_map_rgb(255,255,255), 320/2, 126, ALLEGRO_ALIGN_CENTER, "GRAB A MICROPHONE AND PLAY!");
 		}
 	}
 //	}
+
+	//al_draw_text(data->font, al_map_rgb(255,255,255), 238, 148, ALLEGRO_ALIGN_CENTER, "IN CINEMA");
 
 
 	// FINAL DRAWING
@@ -626,6 +529,8 @@ void FFT(void *buffer, unsigned int samples, void* userdata) {
 	if (min > max) max = min;
 	if (max > data->max_max) data->max_max = max;
 
+	data->max = max;
+
 	for (int i = 0; i < samples; i++) {
 		in[i] = (buf[i] * window[i]) / data->max_max;
 		//buf[i] = 0;
@@ -688,18 +593,8 @@ void Gamestate_ProcessEvent(struct Game *game, struct GamestateResources* data, 
 		data->score1 = 0;
 		data->score2 = 0;
 	}
-	if ((ev->type==ALLEGRO_EVENT_KEY_DOWN) && (ev->keyboard.keycode == ALLEGRO_KEY_M)) {
-		if (data->yoffset == 0) {
-			LoadLevel(game, data, "levels/border.lvl");
-			data->yoffset = 10;
-		} else {
-			LoadLevel(game, data, "levels/multi.lvl");
-			data->yoffset = 0;
-		}
-
-	}
 	if ((ev->type==ALLEGRO_EVENT_KEY_DOWN) && (ev->keyboard.keycode == ALLEGRO_KEY_TAB)) {
-		SwitchCurrentGamestate(game, "cinema");
+		SwitchCurrentGamestate(game, "waaaa");
 	}
 	if ((ev->type==ALLEGRO_EVENT_KEY_DOWN) && ((ev->keyboard.keycode == ALLEGRO_KEY_S) || (ev->keyboard.keycode == ALLEGRO_KEY_BACK))) {
 		data->use_shaders = !data->use_shaders;
@@ -744,7 +639,7 @@ void* Gamestate_Load(struct Game *game, void (*progress)(struct Game*)) {
 	al_set_audio_stream_playing(data->audio, true);
 	al_set_audio_stream_playmode(data->audio, ALLEGRO_PLAYMODE_LOOP);
 	al_attach_audio_stream_to_mixer(data->audio, data->mixer);
-	al_set_audio_stream_gain(data->audio, 1);
+	al_set_audio_stream_gain(data->audio, 0.5);
 
 	data->recorder = al_create_audio_recorder(128, 1024, SAMPLE_RATE,
 	                                   ALLEGRO_AUDIO_DEPTH_FLOAT32, ALLEGRO_CHANNEL_CONF_2);
@@ -850,7 +745,7 @@ void Gamestate_Start(struct Game *game, struct GamestateResources* data) {
 	if (data->recorder) {
 		al_start_audio_recorder(data->recorder);
 	}
-	LoadLevel(game, data, "levels/menu.lvl");
+	LoadLevel(game, data, "levels/cinema.lvl");
 	data->x = 320/2;
 	data->y = 120;
 	data->vx = 0;
@@ -867,6 +762,10 @@ void Gamestate_Start(struct Game *game, struct GamestateResources* data) {
 	data->score2 = 0;
 
 	data->yoffset = 0;
+
+	data->rectwidth = 20;
+
+	data->rectpos = 320;
 }
 
 void Gamestate_Stop(struct Game *game, struct GamestateResources* data) {

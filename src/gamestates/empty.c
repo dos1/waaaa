@@ -712,7 +712,7 @@ void loadlevel(struct Game *game, struct GamestateResources *data, char* name) {
 void* Gamestate_Load(struct Game *game, void (*progress)(struct Game*)) {
 	// Called once, when the gamestate library is being loaded.
 	// Good place for allocating memory, loading bitmaps etc.
-	struct GamestateResources *data = malloc(sizeof(struct GamestateResources));
+	struct GamestateResources *data = calloc(1, sizeof(struct GamestateResources));
 	data->font = al_create_builtin_font();
 
 	data->out = calloc(4096,sizeof(fftw_complex));
@@ -803,6 +803,8 @@ void Gamestate_Stop(struct Game *game, struct GamestateResources* data) {
 	// Called when gamestate gets stopped. Stop timers, music etc. here.
 	al_set_audio_stream_playing(data->audio, false);
 	al_stop_audio_recorder(data->r);
+	al_set_mixer_postprocess_callback(game->audio.music, NULL, NULL);
+
 }
 
 void Gamestate_Pause(struct Game *game, struct GamestateResources* data) {

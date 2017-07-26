@@ -22,7 +22,7 @@
 #include <math.h>
 #include <libsuperderpy.h>
 
-#define NEXT_GAMESTATE "waaaa"
+#define NEXT_GAMESTATE "cinema"
 #define SKIP_GAMESTATE NEXT_GAMESTATE
 
 struct GamestateResources {
