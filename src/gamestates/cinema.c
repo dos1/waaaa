@@ -215,7 +215,7 @@ int ballpos = (1-data->ballpos) * 120 + 50;
 			data->rectwidth = 5;
 		}
 		data->rectpos -= data->rectspeed;
-		data->rectspeed += 0.0005;
+		data->rectspeed += 0.00075;
 
 		if (data->rectpos < -data->rectwidth) {
 			data->rectpos = 320;
@@ -663,7 +663,7 @@ void* Gamestate_Load(struct Game *game, void (*progress)(struct Game*)) {
 
 	data->point_sample = al_load_sample( GetDataFilePath(game, "point.flac") );
 	data->point = al_create_sample_instance(data->point_sample);
-	al_set_sample_instance_gain(data->point, 1.5);
+	al_set_sample_instance_gain(data->point, 1);
 	al_attach_sample_instance_to_mixer(data->point, game->audio.fx);
 	al_set_sample_instance_playmode(data->point, ALLEGRO_PLAYMODE_ONCE);
 
