@@ -23,54 +23,54 @@
 #include <math.h>
 
 // remember to free the returned buffer
-float *CreateHanningWindow(int N, bool periodic) {
+float* CreateHanningWindow(int N, bool periodic) {
 	int half, i, idx, n;
-	float *w;
+	float* w;
 
-	w = (float*) calloc(N, sizeof(float));
-	memset(w, 0, N*sizeof(float));
+	w = (float*)calloc(N, sizeof(float));
+	memset(w, 0, N * sizeof(float));
 
 	if (periodic) {
-		n = N-1;
+		n = N - 1;
 	} else {
 		n = N;
 	}
 
-	if (n%2==0) {
-		half = n/2;
-		for (i=0; i<half; i++) {
-			w[i] = 0.5 * (1 - cos(2*ALLEGRO_PI*(i+1) / (n+1)));
+	if (n % 2 == 0) {
+		half = n / 2;
+		for (i = 0; i < half; i++) {
+			w[i] = 0.5 * (1 - cos(2 * ALLEGRO_PI * (i + 1) / (n + 1)));
 		}
 
-		idx = half-1;
-		for (i=half; i<n; i++) {
+		idx = half - 1;
+		for (i = half; i < n; i++) {
 			w[i] = w[idx];
 			idx--;
 		}
 	} else {
-		half = (n+1)/2;
-		for (i=0; i<half; i++) {
-			w[i] = 0.5 * (1 - cos(2*ALLEGRO_PI*(i+1) / (n+1)));
+		half = (n + 1) / 2;
+		for (i = 0; i < half; i++) {
+			w[i] = 0.5 * (1 - cos(2 * ALLEGRO_PI * (i + 1) / (n + 1)));
 		}
 
-		idx = half-2;
-		for (i=half; i<n; i++) {
+		idx = half - 2;
+		for (i = half; i < n; i++) {
 			w[i] = w[idx];
 			idx--;
 		}
 	}
 
 	if (periodic) {
-		for (i=N-1; i>=1; i--) {
-			w[i] = w[i-1];
+		for (i = N - 1; i >= 1; i--) {
+			w[i] = w[i - 1];
 		}
 		w[0] = 0.0;
 	}
 	return w;
 }
 
-bool GlobalEventHandler(struct Game *game, ALLEGRO_EVENT *ev) {
-	if ((ev->type==ALLEGRO_EVENT_KEY_DOWN) && (ev->keyboard.keycode == ALLEGRO_KEY_F)) {
+bool GlobalEventHandler(struct Game* game, ALLEGRO_EVENT* event) {
+	if ((event->type == ALLEGRO_EVENT_KEY_DOWN) && (event->keyboard.keycode == ALLEGRO_KEY_F)) {
 		game->config.fullscreen = !game->config.fullscreen;
 		if (game->config.fullscreen) {
 			SetConfigOption(game, "SuperDerpy", "fullscreen", "1");
@@ -80,6 +80,7 @@ bool GlobalEventHandler(struct Game *game, ALLEGRO_EVENT *ev) {
 			al_show_mouse_cursor(game->display);
 		}
 		al_set_display_flag(game->display, ALLEGRO_FULLSCREEN_WINDOW, game->config.fullscreen);
+		al_set_display_flag(game->display, ALLEGRO_FRAMELESS, game->config.fullscreen);
 		SetupViewport(game, game->viewport_config);
 		PrintConsole(game, "Fullscreen toggled");
 	}
@@ -87,12 +88,11 @@ bool GlobalEventHandler(struct Game *game, ALLEGRO_EVENT *ev) {
 	return false;
 }
 
-struct CommonResources* CreateGameData(struct Game *game) {
-	struct CommonResources *data = calloc(1, sizeof(struct CommonResources));
+struct CommonResources* CreateGameData(struct Game* game) {
+	struct CommonResources* data = calloc(1, sizeof(struct CommonResources));
 	return data;
 }
 
-void DestroyGameData(struct Game *game) {
+void DestroyGameData(struct Game* game) {
 	free(game->data);
 }
-
