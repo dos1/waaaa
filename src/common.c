@@ -92,7 +92,7 @@ struct CommonResources* CreateGameData(struct Game *game) {
 	return data;
 }
 
-void DestroyGameData(struct Game *game, struct CommonResources *data) {
-	free(data);
+void DestroyGameData(struct Game *game) {
+	free(game->data);
 }
 

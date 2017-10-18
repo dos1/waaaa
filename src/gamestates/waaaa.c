@@ -578,6 +578,12 @@ void Gamestate_Draw(struct Game *game, struct GamestateResources* data) {
 		//al_draw_scaled_bitmap(data->screen, 0 ,0, al_get_bitmap_width(data->screen), al_get_bitmap_height(data->screen), 0, 0, 320, 180, 0);
 		al_draw_scaled_rotated_bitmap(data->screen, al_get_bitmap_width(data->screen)/2, al_get_bitmap_height(data->screen)*(3/4), 320/2, 180/2 - 120 + yoffset, 320/(float)al_get_bitmap_width(data->screen) * 1.1*scale, 180/(float)al_get_bitmap_height(data->screen) * 1.1*scale, rot, 0);
 	}
+
+	al_set_target_bitmap(data->pixelator);
+	al_clear_to_color(al_map_rgba(0,0,0,0));
+	al_draw_text(data->font, al_map_rgb(255,255,255), 319, 180-9, ALLEGRO_ALIGN_RIGHT, "ALPHAAAA BUILD");
+	al_set_target_backbuffer(game->display);
+	al_draw_scaled_bitmap(data->pixelator, 0, 0, 320, 180, 320/2, 180/2, 320/2, 180/2, 0);
 }
 
 void MixerPostprocess(void *buffer, unsigned int samples, void* userdata) {
@@ -699,7 +705,7 @@ void Gamestate_ProcessEvent(struct Game *game, struct GamestateResources* data, 
 
 	}
 	if ((ev->type==ALLEGRO_EVENT_KEY_DOWN) && (ev->keyboard.keycode == ALLEGRO_KEY_TAB)) {
-		SwitchCurrentGamestate(game, "cinema");
+		//SwitchCurrentGamestate(game, "cinema");
 	}
 	if ((ev->type==ALLEGRO_EVENT_KEY_DOWN) && ((ev->keyboard.keycode == ALLEGRO_KEY_S) || (ev->keyboard.keycode == ALLEGRO_KEY_BACK))) {
 		data->use_shaders = !data->use_shaders;
@@ -843,7 +849,7 @@ void Gamestate_Unload(struct Game *game, struct GamestateResources* data) {
 void Gamestate_Start(struct Game *game, struct GamestateResources* data) {
 	// Called when this gamestate gets control. Good place for initializing state,
 	// playing music etc.
-	data->use_shaders = false;
+	data->use_shaders = true;
 	data->ringpos = 0;
 	data->max_max = MAX_MAX_LIMIT;
 	data->demo_mode = true;
