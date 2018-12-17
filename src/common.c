@@ -81,7 +81,7 @@ bool GlobalEventHandler(struct Game* game, ALLEGRO_EVENT* event) {
 		}
 		al_set_display_flag(game->display, ALLEGRO_FULLSCREEN_WINDOW, game->config.fullscreen);
 		al_set_display_flag(game->display, ALLEGRO_FRAMELESS, game->config.fullscreen);
-		SetupViewport(game, game->viewport_config);
+		SetupViewport(game);
 		PrintConsole(game, "Fullscreen toggled");
 	}
 

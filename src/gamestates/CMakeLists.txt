@@ -1,6 +1,1 @@
-FILE (GLOB gamestates "*.c")
-FOREACH(gamestate ${gamestates})
-    get_filename_component(gamestate_name ${gamestate} NAME_WE)
-		register_gamestate(${gamestate_name})
-		target_link_libraries("libsuperderpy-${LIBSUPERDERPY_GAMENAME}-${gamestate_name}" ${FFTW_LIBRARIES})
-ENDFOREACH(gamestate)
+include(libsuperderpy-gamestates)

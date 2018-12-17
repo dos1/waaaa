@@ -18,6 +18,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#define ALLEGRO_UNSTABLE
+
 #include "../common.h"
 #include <allegro5/allegro_color.h>
 #include <fftw3.h>
@@ -94,8 +96,10 @@ int Gamestate_ProgressCount = 1; // number of loading steps as reported by Games
 void FFT(void* buffer, unsigned int samples, void* userdata);
 void LoadLevel(struct Game* game, struct GamestateResources* data, char* name);
 
-void Gamestate_Logic(struct Game* game, struct GamestateResources* data) {
-	// Called 60 times per second. Here you should do all your game logic.
+void Gamestate_Logic(struct Game* game, struct GamestateResources* data, double delta) {}
+
+void Gamestate_Tick(struct Game* game, struct GamestateResources* data) {
+	// Called 60 times per second.
 
 	al_lock_mutex(data->mutex); // we don't want to get the ringbuffer rewritten as we access it
 	int end = data->ringpos - FFT_SAMPLES;
@@ -409,7 +413,7 @@ void LoadLevel(struct Game* game, struct GamestateResources* data, char* name) {
 		}
 	}
 	al_hold_bitmap_drawing(false);
-	al_set_target_backbuffer(game->display);
+	SetFramebufferAsTarget(game);
 }
 
 void Gamestate_Draw(struct Game* game, struct GamestateResources* data) {
@@ -420,7 +424,7 @@ void Gamestate_Draw(struct Game* game, struct GamestateResources* data) {
 		al_set_target_bitmap(data->pixelator);
 		al_clear_to_color(al_color_hsv(fabs(sin(data->rotation / 360.0)) * 360, 0.75, 0.5 + sin(data->rotation / 20.0) / 20.0));
 
-		al_set_target_backbuffer(game->display);
+		SetFramebufferAsTarget(game);
 		al_use_shader(data->shader);
 		al_set_shader_int("scaleFactor", 2);
 
@@ -448,7 +452,7 @@ void Gamestate_Draw(struct Game* game, struct GamestateResources* data) {
 		al_set_blender(ALLEGRO_ADD, ALLEGRO_ONE, ALLEGRO_INVERSE_ALPHA);
 
 		al_set_clipping_rectangle(clipX, clipY, clipWidth, clipHeight);
-		al_use_transform(&game->projection);
+		al_use_transform(&game->_priv.projection);
 	}
 
 	al_set_target_bitmap(data->pixelator);
@@ -489,9 +493,9 @@ void Gamestate_Draw(struct Game* game, struct GamestateResources* data) {
 	}
 
 	al_draw_filled_rectangle(data->x - BALL_WIDTH, data->y - BALL_HEIGHT, data->x + BALL_WIDTH, data->y + BALL_HEIGHT,
-	  //al_color_hsv(fabs(sin((data->rotation/360.0)+ALLEGRO_PI/4.0)) * 360, 1, 1));
+		//al_color_hsv(fabs(sin((data->rotation/360.0)+ALLEGRO_PI/4.0)) * 360, 1, 1));
 
-	  al_map_rgb(255, 255, 0));
+		al_map_rgb(255, 255, 0));
 	//	}
 	// UI DRAWING
 	//	if (data->inmulti) {
@@ -539,7 +543,7 @@ void Gamestate_Draw(struct Game* game, struct GamestateResources* data) {
 	al_draw_tinted_scaled_rotated_bitmap(data->blurer, tint, 320 / 4 / 2, (180 / 4) * (3 / 4), 320 / 2 + 2, 180 / 2 - 120 + yoffset - 3, 1.1 * 4 * scale, 1.1 * 4 * scale, rot, 0);
 	al_hold_bitmap_drawing(false);
 
-	al_set_target_backbuffer(game->display);
+	SetFramebufferAsTarget(game);
 	al_draw_bitmap(data->background, 0, 0, 0);
 
 	float offset = data->distortion / 2.0 * (rand() / (float)RAND_MAX);
@@ -575,7 +579,7 @@ void Gamestate_Draw(struct Game* game, struct GamestateResources* data) {
 
 		//	al_use_shader(NULL);
 
-		al_set_target_backbuffer(game->display);
+		SetFramebufferAsTarget(game);
 		//al_clear_to_color(al_map_rgb(0,255,0));
 		//al_draw_bitmap(data->screen, 0, 0,0);
 		//al_draw_scaled_bitmap(data->screen, 0 ,0, al_get_bitmap_width(data->screen), al_get_bitmap_height(data->screen), 0, 0, 320, 180, 0);
@@ -585,7 +589,7 @@ void Gamestate_Draw(struct Game* game, struct GamestateResources* data) {
 	al_set_target_bitmap(data->pixelator);
 	al_clear_to_color(al_map_rgba(0, 0, 0, 0));
 	al_draw_text(data->font, al_map_rgb(255, 255, 255), 319, 180 - 9, ALLEGRO_ALIGN_RIGHT, "ALPHAAAA BUILD");
-	al_set_target_backbuffer(game->display);
+	SetFramebufferAsTarget(game);
 	al_draw_scaled_bitmap(data->pixelator, 0, 0, 320, 180, 320 / 2, 180 / 2, 320 / 2, 180 / 2, 0);
 }
 
@@ -711,7 +715,7 @@ void Gamestate_ProcessEvent(struct Game* game, struct GamestateResources* data, 
 		}
 	}
 	if ((ev->type == ALLEGRO_EVENT_KEY_DOWN) && (ev->keyboard.keycode == ALLEGRO_KEY_TAB)) {
-		//SwitchCurrentGamestate(game, "cinema");
+		SwitchCurrentGamestate(game, "cinema");
 	}
 	if ((ev->type == ALLEGRO_EVENT_KEY_DOWN) && ((ev->keyboard.keycode == ALLEGRO_KEY_S) || (ev->keyboard.keycode == ALLEGRO_KEY_BACK))) {
 		data->use_shaders = !data->use_shaders;
@@ -763,7 +767,7 @@ void* Gamestate_Load(struct Game* game, void (*progress)(struct Game*)) {
 	al_set_audio_stream_gain(data->audio, 1);
 
 	data->recorder = al_create_audio_recorder(128, 1024, SAMPLE_RATE,
-	  ALLEGRO_AUDIO_DEPTH_FLOAT32, ALLEGRO_CHANNEL_CONF_2);
+		ALLEGRO_AUDIO_DEPTH_FLOAT32, ALLEGRO_CHANNEL_CONF_2);
 
 	if (!data->recorder) {
 		data->music_mode = true;
@@ -821,6 +825,8 @@ void* Gamestate_Load(struct Game* game, void (*progress)(struct Game*)) {
 
 	data->game = game;
 
+	data->shader = CreateShader(game, GetDataFilePath(game, "vertex.glsl"), GetDataFilePath(game, "pixel.glsl"));
+
 	return data;
 }
 
@@ -840,7 +846,7 @@ void Gamestate_Unload(struct Game* game, struct GamestateResources* data) {
 	al_destroy_bitmap(data->pixelator);
 	al_destroy_bitmap(data->blurer);
 	al_destroy_bitmap(data->background);
-	al_destroy_shader(data->shader);
+	DestroyShader(game, data->shader);
 	al_destroy_sample_instance(data->point);
 	al_destroy_sample(data->point_sample);
 
@@ -875,13 +881,6 @@ void Gamestate_Start(struct Game* game, struct GamestateResources* data) {
 	data->score2 = 0;
 
 	data->yoffset = 0;
-
-	data->shader = al_create_shader(ALLEGRO_SHADER_GLSL);
-	PrintConsole(game, "VERTEX: %d", al_attach_shader_source_file(data->shader, ALLEGRO_VERTEX_SHADER, GetDataFilePath(game, "vertex.glsl")));
-	PrintConsole(game, "%s", al_get_shader_log(data->shader));
-	PrintConsole(game, "PIXEL: %d", al_attach_shader_source_file(data->shader, ALLEGRO_PIXEL_SHADER, GetDataFilePath(game, "pixel.glsl")));
-	PrintConsole(game, "%s", al_get_shader_log(data->shader));
-	al_build_shader(data->shader);
 }
 
 void Gamestate_Stop(struct Game* game, struct GamestateResources* data) {
@@ -912,14 +911,6 @@ void Gamestate_Reload(struct Game* game, struct GamestateResources* data) {
 	al_set_new_bitmap_flags(flags | ALLEGRO_MAG_LINEAR | ALLEGRO_MIN_LINEAR);
 	data->screen = CreateNotPreservedBitmap(al_get_display_width(game->display), al_get_display_height(game->display));
 	al_set_new_bitmap_flags(flags);
-
-	al_destroy_shader(data->shader);
-	data->shader = al_create_shader(ALLEGRO_SHADER_GLSL);
-	PrintConsole(game, "VERTEX: %d", al_attach_shader_source_file(data->shader, ALLEGRO_VERTEX_SHADER, GetDataFilePath(game, "vertex.glsl")));
-	PrintConsole(game, "%s", al_get_shader_log(data->shader));
-	PrintConsole(game, "PIXEL: %d", al_attach_shader_source_file(data->shader, ALLEGRO_PIXEL_SHADER, GetDataFilePath(game, "pixel.glsl")));
-	PrintConsole(game, "%s", al_get_shader_log(data->shader));
-	al_build_shader(data->shader);
 
 	LoadLevel(game, data, data->current_level);
 }
