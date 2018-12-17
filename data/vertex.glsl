@@ -1,3 +1,7 @@
+#ifdef GL_ES
+precision mediump float;
+precision mediump int;
+#endif
 
 attribute vec4 al_pos;
 attribute vec4 al_color;
