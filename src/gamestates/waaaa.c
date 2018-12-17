@@ -158,9 +158,9 @@ void Gamestate_Logic(struct Game* game, struct GamestateResources* data) {
 		data->vx = -data->vx;
 		data->x = 0;
 	}
-	if (data->x > 320) {
+	if (data->x > 319) {
 		data->vx = -data->vx;
-		data->x = 320;
+		data->x = 319;
 	}
 	if (data->y == 180 - BALL_HEIGHT - 5) {
 		if (data->vx > 0) {
