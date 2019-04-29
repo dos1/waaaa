@@ -26,7 +26,7 @@
 #include <libsuperderpy.h>
 #include <math.h>
 
-#define SAMPLE_RATE 44100
+#define SAMPLE_RATE 48000
 
 #define FFT_SAMPLES 8192
 

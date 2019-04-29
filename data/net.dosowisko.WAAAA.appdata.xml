@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2018 Sebastian Krzyszkowiak <dos@dosowisko.net> -->
+<component type="desktop-application">
+  <id>net.dosowisko.WAAAA</id>
+  <metadata_license>FSFAP</metadata_license>
+  <project_license>GPL-3.0+</project_license>
+  <name>WAAAA</name>
+  <summary>WAAAAAAAAAAAA</summary>
+
+  <description>
+    <p>
+      WAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+    </p>
+  </description>
+
+  <launchable type="desktop-id">waaaa.desktop</launchable>
+
+  <developer_name>dosowisko.net</developer_name>
+
+  <update_contact>dos_AT_dosowisko.net</update_contact>
+
+  <provides>
+    <binary>waaaa</binary>
+  </provides>
+
+</component>

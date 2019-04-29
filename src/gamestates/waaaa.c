@@ -26,7 +26,7 @@
 #include <libsuperderpy.h>
 #include <math.h>
 
-#define SAMPLE_RATE 44100
+#define SAMPLE_RATE 48000 // FIXME: should match the main mixer
 
 #define FFT_SAMPLES 8192
 
@@ -705,7 +705,7 @@ void Gamestate_ProcessEvent(struct Game* game, struct GamestateResources* data, 
 		data->score1 = 0;
 		data->score2 = 0;
 	}
-	if ((ev->type == ALLEGRO_EVENT_KEY_DOWN) && (ev->keyboard.keycode == ALLEGRO_KEY_M)) {
+	if ((ev->type == ALLEGRO_EVENT_KEY_DOWN) && (ev->keyboard.keycode == ALLEGRO_KEY_N)) {
 		if (data->yoffset == 0) {
 			LoadLevel(game, data, "levels/border.lvl");
 			data->yoffset = 10;

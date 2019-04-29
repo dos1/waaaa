@@ -70,19 +70,12 @@ float* CreateHanningWindow(int N, bool periodic) {
 }
 
 bool GlobalEventHandler(struct Game* game, ALLEGRO_EVENT* event) {
+	if ((event->type == ALLEGRO_EVENT_KEY_DOWN) && (event->keyboard.keycode == ALLEGRO_KEY_M)) {
+		ToggleMute(game);
+	}
+
 	if ((event->type == ALLEGRO_EVENT_KEY_DOWN) && (event->keyboard.keycode == ALLEGRO_KEY_F)) {
-		game->config.fullscreen = !game->config.fullscreen;
-		if (game->config.fullscreen) {
-			SetConfigOption(game, "SuperDerpy", "fullscreen", "1");
-			al_hide_mouse_cursor(game->display);
-		} else {
-			SetConfigOption(game, "SuperDerpy", "fullscreen", "0");
-			al_show_mouse_cursor(game->display);
-		}
-		al_set_display_flag(game->display, ALLEGRO_FULLSCREEN_WINDOW, game->config.fullscreen);
-		al_set_display_flag(game->display, ALLEGRO_FRAMELESS, game->config.fullscreen);
-		SetupViewport(game);
-		PrintConsole(game, "Fullscreen toggled");
+		ToggleFullscreen(game);
 	}
 
 	return false;
