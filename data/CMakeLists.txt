@@ -1,1 +1,1 @@
-include(libsuperderpy-icons)
+include(libsuperderpy-data)
