@@ -53,5 +53,7 @@ int main(int argc, char** argv) {
 
 	game->data = CreateGameData(game);
 
+	al_hide_mouse_cursor(game->display);
+
 	return libsuperderpy_run(game);
 }
