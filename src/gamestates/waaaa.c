@@ -96,11 +96,7 @@ int Gamestate_ProgressCount = 1; // number of loading steps as reported by Games
 void FFT(void* buffer, unsigned int samples, void* userdata);
 void LoadLevel(struct Game* game, struct GamestateResources* data, char* name);
 
-void Gamestate_Logic(struct Game* game, struct GamestateResources* data, double delta) {}
-
-void Gamestate_Tick(struct Game* game, struct GamestateResources* data) {
-	// Called 60 times per second.
-
+void Gamestate_Logic(struct Game* game, struct GamestateResources* data, double delta) {
 	al_lock_mutex(data->mutex); // we don't want to get the ringbuffer rewritten as we access it
 	int end = data->ringpos - FFT_SAMPLES;
 	if (end < 0) {
@@ -109,7 +105,7 @@ void Gamestate_Tick(struct Game* game, struct GamestateResources* data) {
 	int i = 0;
 	for (int pos = end; pos != data->ringpos; pos++) {
 		data->fftbuffer[i] = data->ringbuffer[pos];
-		if (fabs(data->fftbuffer[i]) > 1) {
+		if (fabsf(data->fftbuffer[i]) > 1) {
 			printf("fftbuffer[%d] = ringbuffer[%d] = %f\n", i, pos, data->fftbuffer[i]);
 		}
 		i++;
@@ -120,6 +116,10 @@ void Gamestate_Tick(struct Game* game, struct GamestateResources* data) {
 
 	FFT(data->fftbuffer, FFT_SAMPLES, data);
 	al_unlock_mutex(data->mutex);
+}
+
+void Gamestate_Tick(struct Game* game, struct GamestateResources* data) {
+	// Called 60 times per second.
 
 	float gain = 0;
 	for (int i = 0; i < BARS_NUM; i++) {
