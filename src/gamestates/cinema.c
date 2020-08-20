@@ -26,7 +26,7 @@
 #include <libsuperderpy.h>
 #include <math.h>
 
-#define SAMPLE_RATE 48000
+#define SAMPLE_RATE 44100
 
 #define FFT_SAMPLES 8192
 
@@ -474,7 +474,7 @@ void Gamestate_Draw(struct Game* game, struct GamestateResources* data) {
 	}
 }
 
-void MixerPostprocess(void* buffer, unsigned int samples, void* userdata) {
+static void MixerPostprocess(void* buffer, unsigned int samples, void* userdata) {
 	// REMEMBER: don't use any drawing code inside this function
 	// PrintConsole etc. NOT ALLOWED!
 	float* buf = buffer;
@@ -618,6 +618,9 @@ void* Gamestate_Load(struct Game* game, void (*progress)(struct Game*)) {
 	data->font = al_create_builtin_font();
 	progress(game); // report that we progressed with the loading, so the engine can draw a progress bar
 
+	int flags = al_get_new_bitmap_flags();
+	al_set_new_bitmap_flags(flags ^ ALLEGRO_MAG_LINEAR);
+
 	for (int i = 0; i < SAMPLE_RATE; i++) {
 		data->ringbuffer[i] = 0;
 	}
@@ -660,7 +663,6 @@ void* Gamestate_Load(struct Game* game, void (*progress)(struct Game*)) {
 	al_attach_sample_instance_to_mixer(data->point, game->audio.fx);
 	al_set_sample_instance_playmode(data->point, ALLEGRO_PLAYMODE_ONCE);
 
-	int flags = al_get_new_bitmap_flags();
 	al_set_new_bitmap_flags(flags | ALLEGRO_MAG_LINEAR | ALLEGRO_MIN_LINEAR);
 	data->screen = CreateNotPreservedBitmap(al_get_display_width(game->display), al_get_display_height(game->display));
 
