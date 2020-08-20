@@ -26,7 +26,7 @@
 #include <libsuperderpy.h>
 #include <math.h>
 
-#define SAMPLE_RATE 48000 // FIXME: should match the main mixer
+#define SAMPLE_RATE 44100 // FIXME: should match the main mixer
 
 #define FFT_SAMPLES 8192
 
