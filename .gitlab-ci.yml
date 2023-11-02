@@ -1,0 +1,4 @@
+include:
+  - project: dosowisko.net/libsuperderpy-utils
+    ref: 6c6e28ef48226d10185ab2c11eaed9d6f6cae19c
+    file: /gitlab-ci.template.yml
