@@ -434,8 +434,6 @@ void Gamestate_Draw(struct Game* game, struct GamestateResources* data) {
 	} else {
 		ALLEGRO_TRANSFORM trans;
 		al_identity_transform(&trans);
-		int clipX, clipY, clipWidth, clipHeight;
-		al_get_clipping_rectangle(&clipX, &clipY, &clipWidth, &clipHeight);
 		al_set_clipping_rectangle(0, 0, al_get_display_width(game->display), al_get_display_height(game->display));
 		al_use_transform(&trans);
 
@@ -451,8 +449,7 @@ void Gamestate_Draw(struct Game* game, struct GamestateResources* data) {
 		al_hold_bitmap_drawing(false);
 		al_set_blender(ALLEGRO_ADD, ALLEGRO_ONE, ALLEGRO_INVERSE_ALPHA);
 
-		al_set_clipping_rectangle(clipX, clipY, clipWidth, clipHeight);
-		al_use_transform(&game->_priv.projection);
+		ResetClippingRectangle();
 	}
 
 	al_set_target_bitmap(data->pixelator);
@@ -777,7 +774,7 @@ void* Gamestate_Load(struct Game* game, void (*progress)(struct Game*)) {
 	if (data->music_mode) {
 		al_set_mixer_postprocess_callback(data->mixer, MixerPostprocess, data);
 	} else {
-		al_register_event_source(game->_priv.event_queue, al_get_audio_recorder_event_source(data->recorder));
+		al_register_event_source(game->event_queue, al_get_audio_recorder_event_source(data->recorder));
 	}
 
 	data->pixelator = CreateNotPreservedBitmap(320, 180);
