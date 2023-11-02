@@ -3,4 +3,8 @@ set(SHARED_SRC_LIST "common.c")
 
 include(libsuperderpy-src)
 
-target_link_libraries("lib${LIBSUPERDERPY_GAMENAME}" ${FFTW_LIBRARIES})
+if (FFTW_FOUND)
+   target_link_libraries("lib${LIBSUPERDERPY_GAMENAME}" ${FFTW_LIBRARIES})
+else (FFTW_FOUND)
+   target_link_libraries("lib${LIBSUPERDERPY_GAMENAME}" fftw3)
+endif (FFTW_FOUND)
