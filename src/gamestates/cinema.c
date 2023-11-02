@@ -112,9 +112,9 @@ void Gamestate_Tick(struct Game* game, struct GamestateResources* data) {
 	int i = 0;
 	for (int pos = end; pos != data->ringpos; pos++) {
 		data->fftbuffer[i] = data->ringbuffer[pos];
-		if (fabs(data->fftbuffer[i]) > 1) {
-			printf("fftbuffer[%d] = ringbuffer[%d] = %f\n", i, pos, data->fftbuffer[i]);
-		}
+		//if (fabs(data->fftbuffer[i]) > 1) {
+		//	printf("fftbuffer[%d] = ringbuffer[%d] = %f\n", i, pos, data->fftbuffer[i]);
+		//}
 		i++;
 		if (pos == SAMPLE_RATE - 1) {
 			pos = -1;

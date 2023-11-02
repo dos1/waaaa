@@ -33,6 +33,7 @@
 #define BARS_NUM (8192 / 2)
 #define BARS_WIDTH 4
 #define BARS_OFFSET 8
+#define BAR_HEIGHT 68
 
 #define MAX_MAX_LIMIT 0.042
 
@@ -105,9 +106,9 @@ void Gamestate_Logic(struct Game* game, struct GamestateResources* data, double 
 	int i = 0;
 	for (int pos = end; pos != data->ringpos; pos++) {
 		data->fftbuffer[i] = data->ringbuffer[pos];
-		if (fabsf(data->fftbuffer[i]) > 1) {
-			printf("fftbuffer[%d] = ringbuffer[%d] = %f\n", i, pos, data->fftbuffer[i]);
-		}
+		//if (fabsf(data->fftbuffer[i]) > 1) {
+		//	printf("fftbuffer[%d] = ringbuffer[%d] = %f\n", i, pos, data->fftbuffer[i]);
+		//}
 		i++;
 		if (pos == SAMPLE_RATE - 1) {
 			pos = -1;
@@ -121,19 +122,20 @@ void Gamestate_Logic(struct Game* game, struct GamestateResources* data, double 
 void Gamestate_Tick(struct Game* game, struct GamestateResources* data) {
 	// Called 60 times per second.
 
-	float gain = 0;
+	float gain = 0, sum = 0;
+	int bwidth = 1;
 	for (int i = 0; i < BARS_NUM; i++) {
 		data->bars[i] = 0;
-		int width = 1;
-		for (int j = i * width; j < i * width + width; j++) {
-			data->bars[i] += data->fft[j + 8 * width];
-			if (gain < data->fft[j + 8 * width]) {
-				gain = data->fft[j + 8 * width];
+		for (int j = i * bwidth; j < i * bwidth + bwidth; j++) {
+			data->bars[i] += data->fft[j + 8 * bwidth];
+			sum += data->fft[j + 8 * bwidth];
+			if (gain < data->fft[j + 8 * bwidth]) {
+				gain = data->fft[j + 8 * bwidth];
 			}
 		}
-		data->bars[i] /= width;
+		data->bars[i] /= bwidth;
 	}
-	data->distortion = gain * 2;
+	data->distortion = (gain - sum / (BARS_NUM * bwidth)) * 2;
 	data->rotation += data->distortion * 3;
 
 	//PrintConsole(game, "gain %f", gain);
@@ -151,19 +153,23 @@ void Gamestate_Tick(struct Game* game, struct GamestateResources* data) {
 	} else if (data->vx < 0) {
 		data->vx += 0.005;
 	}
-	data->vy += 0.05;
+	data->vy += 0.075;
 
 	if (data->y > 180 - BALL_HEIGHT - 5) {
-		data->vy = -data->vy / 3;
+		data->vy = -data->vy / 2;
 		data->y = 178 - 5;
+	}
+	if (data->y < 0) {
+		data->y = 0;
+		data->vy = -data->vy * 0.75;
 	}
 
 	if (data->x < 0) {
-		data->vx = -data->vx;
+		data->vx = -data->vx * 0.75;
 		data->x = 0;
 	}
 	if (data->x > 319) {
-		data->vx = -data->vx;
+		data->vx = -data->vx * 0.75;
 		data->x = 319;
 	}
 	if (data->y == 180 - BALL_HEIGHT - 5) {
@@ -182,9 +188,9 @@ void Gamestate_Tick(struct Game* game, struct GamestateResources* data) {
 		if (data->bars[i] != data->bars[i]) { // NaN
 			break;
 		}
-		int pos = 176 - data->bars[i] * 64;
-		int prev = 176 - data->bars[i - 1] * 64;
-		int next = 176 - data->bars[i + 1] * 64;
+		int pos = 176 - data->bars[i] * BAR_HEIGHT;
+		int prev = 176 - data->bars[i - 1] * BAR_HEIGHT;
+		int next = 176 - data->bars[i + 1] * BAR_HEIGHT;
 		//PrintConsole(game, "data->y %f, pos %d", data->y, pos);
 
 		if (data->y - BALL_HEIGHT >= pos) {
@@ -192,18 +198,18 @@ void Gamestate_Tick(struct Game* game, struct GamestateResources* data) {
 
 			if (x - 1 == data->x) {
 				// left
-				data->vy = (pos - data->y) / 15;
+				data->vy = (pos - data->y) / 10;
 				data->vx += -2;
 				PrintConsole(game, "left bump %d", pos);
 				data->y = pos;
 			} else if (x + width == data->x) {
 				// right
-				data->vy = (pos - data->y) / 15;
+				data->vy = (pos - data->y) / 10;
 				data->vx += 2;
 				data->y = pos;
 				PrintConsole(game, "right bump %d", pos);
 			} else if ((x <= data->x) && (x + width >= data->x)) {
-				data->vy = (pos - data->y) / 15 - data->vy * 0.5;
+				data->vy = (pos - data->y) / 8; // - data->vy * 0.25;
 				data->vx += ((rand() / (float)RAND_MAX) - 0.5) * 2;
 				data->y = pos;
 				//PrintConsole(game, "center bump %d", pos);
@@ -229,11 +235,11 @@ void Gamestate_Tick(struct Game* game, struct GamestateResources* data) {
 	int sx = (int)(data->x / 4);
 	int sy = (int)(data->y / 4);
 
-	int tx = oldsx;
-	int ty = oldsy;
+	int tx = MAX(0, oldsx);
+	int ty = MAX(0, oldsy);
 
-	int colx = sx;
-	int coly = sy;
+	int colx = MAX(0, sx);
+	int coly = MAX(0, sy);
 
 	while ((tx != sx) && (ty != sy)) {
 		if (data->level[tx][ty] == '0') {
@@ -467,35 +473,31 @@ void Gamestate_Draw(struct Game* game, struct GamestateResources* data) {
 	width *= BARS_WIDTH;
 	for (int i = BARS_OFFSET; i < BARS_NUM; i++) {
 		int a = i - BARS_OFFSET;
-		al_draw_filled_rectangle(a * width, (int)(176 - data->bars[i] * 64), a * width + width, 180, al_map_rgb(255, 255, 255));
+		al_draw_filled_rectangle(a * width, (int)(176 - data->bars[i] * BAR_HEIGHT), a * width + width, 180, al_map_rgb(255, 255, 255));
 		if (a * width > game->viewport.width) {
 			break;
 		}
 	}
 	al_hold_bitmap_drawing(false);
 
-	/*
 	// WAVEFORM DRAWING
-	width=1;
-	for (int i=0; i<4096; i++) {
-		al_draw_filled_rectangle(i*width, 180/2 - data->fftbuffer[i]*180/2, i*width+width, 180/2, al_map_rgb(255,255,0));
+	/*
+	width = 1;
+	for (int i = 0; i < FFT_SAMPLES; i++) {
+		al_draw_filled_rectangle(i * width, 180 / 2 - data->fftbuffer[i] * 180 / 2, i * width + width, 180 / 2, al_map_rgb(255, 255, 0));
 	}
-	al_draw_textf(data->font, al_map_rgb(255,255,255), 10, 10, ALLEGRO_ALIGN_LEFT, "%d", data->ringpos);
+	al_draw_textf(data->font, al_map_rgb(255, 255, 255), 10, 10, ALLEGRO_ALIGN_LEFT, "%d", data->ringpos);
 	*/
 
 	// BALL DRAWING
-	//	if (!data->inmenu){
 	if (!data->demo_mode) {
 		al_draw_textf(data->font, al_map_rgb(255, 255, 255), 320 / 2, 72, ALLEGRO_ALIGN_CENTER, data->shakin_dudi ? (((data->shakin_dudi / 10) % 2) ? "" : "SCORE!") : "WAAAA");
 	}
 
 	al_draw_filled_rectangle(data->x - BALL_WIDTH, data->y - BALL_HEIGHT, data->x + BALL_WIDTH, data->y + BALL_HEIGHT,
-		//al_color_hsv(fabs(sin((data->rotation/360.0)+ALLEGRO_PI/4.0)) * 360, 1, 1));
-
 		al_map_rgb(255, 255, 0));
-	//	}
+
 	// UI DRAWING
-	//	if (data->inmulti) {
 	if (!data->demo_mode) {
 		al_draw_textf(data->font, al_map_rgb(255, 255, 255), 320 / 2, 82, ALLEGRO_ALIGN_CENTER, "%d:%d", data->score1, data->score2);
 	}
@@ -504,7 +506,6 @@ void Gamestate_Draw(struct Game* game, struct GamestateResources* data) {
 			al_draw_text(data->font, al_map_rgb(255, 255, 255), 320 / 2, 126, ALLEGRO_ALIGN_CENTER, "GRAB A MICROPHONE AND PLAY!");
 		}
 	}
-	//	}
 
 	// FINAL DRAWING
 	al_set_target_bitmap(data->blurer);
@@ -678,6 +679,12 @@ void FFT(void* buffer, unsigned int samples, void* userdata) {
 			}
 		}
 		data->fft[i] = val;
+		if (!data->music_mode) {
+			data->fft[i / 2] += val / 2;
+			if (data->fft[i / 2] > 1) data->fft[i / 2] = 1;
+			data->fft[i / 4] += val / 4;
+			if (data->fft[i / 4] > 1) data->fft[i / 4] = 1;
+		}
 	}
 
 	fftw_destroy_plan(p);
