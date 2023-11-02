@@ -700,7 +700,7 @@ void Gamestate_ProcessEvent(struct Game* game, struct GamestateResources* data, 
 		UnloadCurrentGamestate(game); // mark this gamestate to be stopped and unloaded
 		// When there are no active gamestates, the engine will quit.
 	}
-	if ((ev->type == ALLEGRO_EVENT_KEY_DOWN) && (ev->keyboard.keycode == ALLEGRO_KEY_SPACE)) {
+	if (game->config.debug.enabled && (ev->type == ALLEGRO_EVENT_KEY_DOWN) && (ev->keyboard.keycode == ALLEGRO_KEY_SPACE)) {
 		data->x = 320 / 2;
 		data->y = 120;
 		data->vx = 0;
@@ -710,7 +710,7 @@ void Gamestate_ProcessEvent(struct Game* game, struct GamestateResources* data, 
 		data->score1 = 0;
 		data->score2 = 0;
 	}
-	if ((ev->type == ALLEGRO_EVENT_KEY_DOWN) && (ev->keyboard.keycode == ALLEGRO_KEY_N)) {
+	if (game->config.debug.enabled && (ev->type == ALLEGRO_EVENT_KEY_DOWN) && (ev->keyboard.keycode == ALLEGRO_KEY_N)) {
 		if (data->yoffset == 0) {
 			LoadLevel(game, data, "levels/border.lvl");
 			data->yoffset = 10;
@@ -722,9 +722,12 @@ void Gamestate_ProcessEvent(struct Game* game, struct GamestateResources* data, 
 	if ((ev->type == ALLEGRO_EVENT_KEY_DOWN) && (ev->keyboard.keycode == ALLEGRO_KEY_TAB)) {
 		SwitchCurrentGamestate(game, "cinema");
 	}
-	if ((ev->type == ALLEGRO_EVENT_KEY_DOWN) && ((ev->keyboard.keycode == ALLEGRO_KEY_S) || (ev->keyboard.keycode == ALLEGRO_KEY_BACK))) {
+	if (game->config.debug.enabled && (ev->type == ALLEGRO_EVENT_KEY_DOWN) && (ev->keyboard.keycode == ALLEGRO_KEY_S)) {
 		data->use_shaders = !data->use_shaders;
 		PrintConsole(game, "use_shaders: %d", data->use_shaders);
+		LoadLevel(game, data, data->current_level);
+	}
+	if ((ev->type == ALLEGRO_EVENT_KEY_DOWN) && (ev->keyboard.keycode == ALLEGRO_KEY_BACK)) {
 		LoadLevel(game, data, data->current_level);
 	}
 
