@@ -1,16 +1,18 @@
 {
 "app-id": "net.dosowisko.WAAAA",
 "runtime": "org.freedesktop.Platform",
-"runtime-version": "18.08",
+"runtime-version": "22.08",
 "sdk": "org.freedesktop.Sdk",
 "command": "waaaa",
 "rename-icon": "waaaa",
 "rename-desktop-file": "waaaa.desktop",
 "finish-args": [
-   "--socket=x11",
+   "--socket=wayland",
+   "--socket=fallback-x11",
    "--socket=pulseaudio",
    "--device=dri",
-   "--share=ipc"
+   "--share=ipc",
+   "--env=SDL_MOUSE_AUTO_CAPTURE=0"
 ],
 "cleanup": ["/include", "/lib/pkgconfig", "/lib/*.a", "/lib/*.la", "/share/aclocal", "/share/doc", "/bin/test_physfs"],
 "modules": [
@@ -18,13 +20,12 @@
     "name": "allegro5",
     "buildsystem": "cmake-ninja",
     "build-options": {
-       "config-opts": ["-DGL_BUILD_TYPE=gles2+", "-DWANT_DEMO=OFF", "-DWANT_EXAMPLES=OFF", "-DCMAKE_BUILD_TYPE=RelWithDebInfo"]
+       "config-opts": ["-DCMAKE_BUILD_TYPE=RelWithDebInfo", "-DALLEGRO_SDL=ON", "-DGL_BUILD_TYPE=gles2+", "-DWANT_DEMO=OFF", "-DWANT_EXAMPLES=OFF", "-DWANT_TESTS=OFF"]
     },
     "sources": [
       {
-        "type": "git",
-        "branch": "dos",
-        "url": "git://github.com/dos1/allegro5"
+        "type": "dir",
+        "path": "../libsuperderpy/src/3rdparty/allegro5"
       }
     ]
   },
