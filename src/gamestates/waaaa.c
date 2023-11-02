@@ -799,6 +799,17 @@ void* Gamestate_Load(struct Game* game, void (*progress)(struct Game*)) {
 	al_attach_sample_instance_to_mixer(data->point, game->audio.fx);
 	al_set_sample_instance_playmode(data->point, ALLEGRO_PLAYMODE_ONCE);
 
+	data->game = game;
+
+	data->shader = CreateShader(game, GetDataFilePath(game, "vertex.glsl"), GetDataFilePath(game, "pixel.glsl"));
+
+	al_set_new_bitmap_flags(flags);
+
+	return data;
+}
+
+void Gamestate_PostLoad(struct Game* game, struct GamestateResources* data) {
+	int flags = al_get_new_bitmap_flags();
 	al_set_new_bitmap_flags(flags | ALLEGRO_MAG_LINEAR | ALLEGRO_MIN_LINEAR);
 	data->screen = CreateNotPreservedBitmap(al_get_display_width(game->display), al_get_display_height(game->display));
 
@@ -829,12 +840,6 @@ void* Gamestate_Load(struct Game* game, void (*progress)(struct Game*)) {
 	al_destroy_bitmap(crt);
 
 	al_set_new_bitmap_flags(flags);
-
-	data->game = game;
-
-	data->shader = CreateShader(game, GetDataFilePath(game, "vertex.glsl"), GetDataFilePath(game, "pixel.glsl"));
-
-	return data;
 }
 
 void Gamestate_Unload(struct Game* game, struct GamestateResources* data) {
