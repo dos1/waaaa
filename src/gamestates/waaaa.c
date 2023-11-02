@@ -278,6 +278,7 @@ void Gamestate_Tick(struct Game* game, struct GamestateResources* data) {
 			data->score2++;
 		}
 
+		al_stop_sample_instance(data->point);
 		al_play_sample_instance(data->point);
 	}
 
