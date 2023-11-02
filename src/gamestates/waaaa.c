@@ -852,6 +852,7 @@ void Gamestate_Unload(struct Game* game, struct GamestateResources* data) {
 		al_destroy_audio_recorder(data->recorder);
 	}
 	al_destroy_bitmap(data->crt);
+	al_destroy_bitmap(data->crtbg);
 	al_destroy_bitmap(data->screen);
 	al_destroy_bitmap(data->stage);
 
