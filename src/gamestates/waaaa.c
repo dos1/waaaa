@@ -722,11 +722,13 @@ void Gamestate_ProcessEvent(struct Game* game, struct GamestateResources* data, 
 	if ((ev->type == ALLEGRO_EVENT_KEY_DOWN) && (ev->keyboard.keycode == ALLEGRO_KEY_TAB)) {
 		SwitchCurrentGamestate(game, "cinema");
 	}
+#ifndef __EMSCRIPTEN__
 	if (game->config.debug.enabled && (ev->type == ALLEGRO_EVENT_KEY_DOWN) && (ev->keyboard.keycode == ALLEGRO_KEY_S)) {
 		data->use_shaders = !data->use_shaders;
 		PrintConsole(game, "use_shaders: %d", data->use_shaders);
 		LoadLevel(game, data, data->current_level);
 	}
+#endif
 	if ((ev->type == ALLEGRO_EVENT_KEY_DOWN) && (ev->keyboard.keycode == ALLEGRO_KEY_BACK)) {
 		LoadLevel(game, data, data->current_level);
 	}
@@ -813,6 +815,7 @@ void Gamestate_PostLoad(struct Game* game, struct GamestateResources* data) {
 	al_set_new_bitmap_flags(flags | ALLEGRO_MAG_LINEAR | ALLEGRO_MIN_LINEAR);
 	data->screen = CreateNotPreservedBitmap(al_get_display_width(game->display), al_get_display_height(game->display));
 
+#ifndef __EMSCRIPTEN__
 	data->crt = al_create_bitmap(500, 500);
 	ALLEGRO_BITMAP* crt = al_load_bitmap(GetDataFilePath(game, "crt.png"));
 	al_set_target_bitmap(data->crt);
@@ -838,6 +841,7 @@ void Gamestate_PostLoad(struct Game* game, struct GamestateResources* data) {
 	}
 	al_hold_bitmap_drawing(false);
 	al_destroy_bitmap(crt);
+#endif
 
 	al_set_new_bitmap_flags(flags);
 }
@@ -851,8 +855,10 @@ void Gamestate_Unload(struct Game* game, struct GamestateResources* data) {
 	if (data->recorder) {
 		al_destroy_audio_recorder(data->recorder);
 	}
+#ifndef __EMSCRIPTEN__
 	al_destroy_bitmap(data->crt);
 	al_destroy_bitmap(data->crtbg);
+#endif
 	al_destroy_bitmap(data->screen);
 	al_destroy_bitmap(data->stage);
 
